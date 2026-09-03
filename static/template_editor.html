@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DFM 模板可视化绑定 · 点选页面对象关联表单字段</title>
+<style>
+:root{--accent:#ff6a00;--accent2:#d95f00;--line:#e3e8ef;--line2:#d3dae4;--txt:#1f2328;--muted:#6b7684;--bg:#f4f6f9;--panel:#fff;--ok:#128a3c;--bad:#c62828;--r:8px}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--txt);font-size:13px;line-height:1.55;font-family:"Noto Sans SC","Microsoft YaHei",Arial,sans-serif}
+header{position:sticky;top:0;z-index:80;display:flex;align-items:center;gap:10px;padding:8px 16px;background:linear-gradient(90deg,#FF6A00,#FF8A33);color:#fff}
+header b{font-size:15px}
+.spacer{flex:1}
+a.back{color:#fff;text-decoration:none;font-size:12px;background:rgba(255,255,255,.2);padding:3px 10px;border-radius:12px}
+.wrap{display:grid;grid-template-columns:300px 1fr;gap:12px;padding:12px 16px;max-width:1600px;margin:0 auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:12px}
+.card h3{margin:0 0 8px;font-size:13px;color:#c25200;border-bottom:1px solid var(--line);padding-bottom:6px}
+label{font-size:11.5px;color:#5a6673;display:block;margin:6px 0 2px}
+select,input[type=text],input[type=number]{width:100%;border:1px solid var(--line2);border-radius:5px;padding:5px 7px;background:#fff;font-size:12.5px}
+button{cursor:pointer;border:1px solid var(--line2);background:#fff;border-radius:6px;padding:5px 10px;font-size:12px}
+button.pri{background:linear-gradient(180deg,#ff7a12,#e85d00);border-color:#ff8a2e;color:#fff;font-weight:700}
+button.sm{padding:2px 7px;font-size:11px}
+button:hover{border-color:var(--accent)}
+button.dg{color:var(--bad)}button.dg:hover{border-color:var(--bad)}
+.hint{font-size:11px;color:#8a94a3}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+.mono{font-family:Consolas,monospace}
+/* ---------- 画布 ---------- */
+#canvasWrap{background:#3a4250;border-radius:10px;padding:14px;overflow:auto;position:relative}
+#canvas{position:relative;background:#fff;margin:0 auto;box-shadow:0 6px 24px rgba(0,0,0,.35);overflow:hidden}
+.sbox{position:absolute;border:1px solid #cfd6e0;overflow:hidden;font-size:12px;cursor:pointer;line-height:1.25;
+  user-select:none;word-break:break-word}
+.sbox .tagline{position:absolute;left:0;right:0;top:0;font-size:9px;background:rgba(255,106,0,.85);color:#fff;
+  padding:0 3px;white-space:nowrap;overflow:hidden;opacity:0;transition:.12s;z-index:3}
+.sbox:hover .tagline,.sbox.sel .tagline{opacity:1}
+.sbox:hover{border-color:var(--accent)}
+.sbox.sel{border:2px solid var(--accent);box-shadow:0 0 0 2px rgba(255,106,0,.35)}
+.sbox.bound{border:2px solid var(--ok)}
+.sbox.bound::after{content:'✓ 已绑定';position:absolute;right:2px;bottom:2px;font-size:9px;color:#fff;background:rgba(18,138,60,.85);padding:0 4px;border-radius:8px;z-index:3}
+.sbox.sel.bound::after{background:var(--accent)}
+.sbox .inner{position:absolute;inset:3px;overflow:hidden}
+.k-text{background:#fbfcfe;color:#2b3440;padding:2px 4px}
+.k-text .ph{color:#c05a00;background:#fff3e8;border-radius:3px;padding:0 2px}
+.k-picture{background:repeating-linear-gradient(45deg,#eef1f5,#eef1f5 6px,#e4e9ef 6px,#e4e9ef 12px);display:flex;align-items:center;justify-content:center;color:#7a8794;text-align:center;font-size:11px}
+.k-table{background:#fff;display:block}.tbl-frame{border:none!important}
+.k-cell{position:absolute;border:1px solid #b9c3d0;background:#fff;overflow:hidden;font-size:10px;padding:1px 3px;cursor:pointer}
+.k-cell:hover{background:#fff5ee}
+.k-cell.sel{border:2px solid var(--accent)}
+.k-cell.bound{border:2px solid var(--ok);background:#f2faf4}
+.k-group{background:#f7f9fb;border:2px dashed #9aa4b2;display:flex;align-items:center;justify-content:center;color:#55637a;font-size:11px;text-align:center}
+.k-other{background:#eef1f5;display:flex;align-items:center;justify-content:center;color:#55637a;font-size:11px;text-align:center}
+/* 原 PPT 预览加载后，对象框只负责命中与选中，不遮挡真实页面。 */
+#canvas.real-preview{background-size:100% 100%;background-repeat:no-repeat;background-position:center}
+#canvas.real-preview .sbox{background:transparent;color:transparent;border-color:transparent;padding:0}
+#canvas.real-preview .sbox .inner{opacity:0}
+#canvas.real-preview .sbox:hover{border:1px solid var(--accent);background:rgba(255,106,0,.06)}
+#canvas.real-preview .sbox.sel{border:2px solid var(--accent);background:rgba(255,106,0,.08)}
+#canvas.real-preview .sbox.bound{border:2px solid rgba(18,138,60,.65)}
+#canvas.real-preview .k-cell{background:transparent;color:transparent;border-color:rgba(185,195,208,.15)}
+#canvas.real-preview .k-cell:hover{background:rgba(255,106,0,.08);border-color:var(--accent)}
+#canvas.real-preview .k-cell.sel{background:rgba(255,106,0,.10);border-color:var(--accent)}
+#canvas.real-preview .k-cell.bound{background:rgba(18,138,60,.05);border-color:rgba(18,138,60,.65)}
+#canvas.real-preview .paginated-table .k-cell{display:none}
+#selBar{background:#fff7f0;border:1px solid #ffd2ad;border-radius:8px;padding:8px 10px;margin-top:10px}
+#selBar table{width:100%;border-collapse:collapse}
+#selBar td{padding:2px 4px;vertical-align:top}
+#partialOriginal{width:100%;min-height:135px;resize:vertical;font:14px/1.8 "Microsoft YaHei",sans-serif;border:1px solid #ccd5df;border-radius:6px;padding:8px;background:#fff}
+#partialResult{white-space:pre-wrap;overflow-wrap:anywhere;padding:10px;background:#fff;border:1px solid #d8e4d9;border-radius:6px;max-height:240px;overflow:auto}
+#partialResult mark{background:#dcf2df;color:#125b2b}
+.partial-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #e3e8ef}
+/* ---------- 左栏列表 ---------- */
+.page-item{border:1px solid var(--line);border-radius:6px;padding:5px 8px;margin:4px 0;cursor:pointer;font-size:12px}
+.page-item:hover{border-color:var(--accent)}
+.page-item.cur{border-color:var(--accent);background:#fff4ec}
+.page-item .pno{font-weight:700;color:#c25200}
+.binding-chip{display:inline-block;background:#eef7ee;border:1px solid #b9dfc4;color:#0f7a37;border-radius:10px;
+  padding:0 6px;font-size:10.5px;margin:1px 2px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
+.toastbox{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;background:#fff;border:1px solid var(--accent);padding:8px 18px;border-radius:20px;font-size:12.5px;box-shadow:0 6px 20px rgba(0,0,0,.15);display:none}
+#mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:150;display:none;place-items:center}
+#mask.on{display:grid}
+#mask .box{background:#fff;border-radius:10px;padding:20px 30px}
+.spinner{width:30px;height:30px;border:3px solid #e3e8ef;border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 10px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.toolbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.toolbar label{margin:0}
+.chip-btn{font-size:11px;border-radius:12px;padding:2px 9px;background:#fff3e8;border:1px solid #ffd2ad;color:#c25200}
+.chip-btn:hover{background:#ffe2cc}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,.sbox:focus-visible,.k-cell:focus-visible{outline:3px solid #e76712;outline-offset:2px}
+.hint{color:#647180}
+.object-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.object-toolbar label{margin:0}.object-toolbar select{flex:1;min-width:210px}.object-toolbar input{max-width:190px}
+.editor-status{margin:8px 0;color:#925000;font-size:12px}
+.formula-block{border:1px solid var(--line2);padding:10px;border-radius:6px;background:#fff;margin:8px 0}
+.formula-block textarea{width:100%;resize:vertical;min-height:48px;font:14px/1.6 'Microsoft YaHei',sans-serif;border:1px solid var(--line2);border-radius:4px;padding:6px}
+.formula-block .block-actions{display:flex;gap:6px;align-items:center}.block-actions strong{flex:1}
+.formula-tools{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.formula-tools button{min-width:34px}
+#formulaPreviewImage{display:block;width:100%;max-height:160px;object-fit:contain;background:white;border:1px solid var(--line);border-radius:6px}
+dialog{width:min(900px,calc(100vw - 32px));max-height:calc(100vh - 60px);border:1px solid var(--line2);border-radius:12px;padding:20px;color:var(--txt);overflow:auto}
+dialog::backdrop{background:rgba(15,23,42,.5)}
+.dialog-title{display:flex;gap:12px;align-items:center}.dialog-title h2{font-size:18px;margin:0;flex:1}
+.reuse-grid{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;margin:14px 0}
+.reuse-preview{min-height:200px;display:grid;place-items:center;background:#edf0f4;border-radius:6px;padding:8px}
+.reuse-preview img{width:100%;max-height:330px;object-fit:contain}.dialog-footer{display:flex;gap:10px;align-items:center;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--line)}
+button:disabled{opacity:.5;cursor:not-allowed}.page-item .page-tools{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+#selBar{scroll-margin-top:65px}#btnBind{position:sticky;bottom:0;z-index:5}
+@media(max-width:900px){.wrap{grid-template-columns:240px minmax(0,1fr);padding:10px}.reuse-grid{grid-template-columns:1fr}}
+@media(max-width:650px){.wrap{grid-template-columns:1fr}header span:not(.spacer){display:none}.object-toolbar input{max-width:none}.reuse-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <b>DFM 模板可视化绑定</b>
+  <span style="font-size:11px;opacity:.9">导入 PPT → 点击页面上的标题/表格/图片对象 → 关联表单字段 → 生成替换后的 PPT</span>
+  <span class="spacer"></span>
+  <a class="back" href="/">← 返回 DFM 表单</a>
+</header>
+
+<div class="wrap">
+  <!-- ============ 左栏 ============ -->
+  <div>
+    <div class="card">
+      <h3>① 模板与数据</h3>
+      <label>模板（内置或已上传）</label>
+      <select id="selTemplate"></select>
+      <button class="sm" id="btnRefreshTemplates" style="margin-top:4px">刷新清单</button>
+      <label>或导入 .pptx 模板文件</label>
+      <input type="file" id="fileUpload" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation">
+      <label>网页表单数据来源</label>
+      <select id="selData">
+        <option value="demo">示例数据（表单全填示例）</option>
+        <option value="project">服务器已保存项目</option>
+        <option value="empty">空数据</option>
+      </select>
+      <button class="pri" id="btnLoadTpl" style="margin-top:6px;width:100%">加载模板</button>
+      <div class="hint" id="tplHint" style="margin-top:6px"></div>
+    </div>
+
+    <div class="card">
+      <h3>② 模板方案（绑定一次，之后填表直接生成）</h3>
+      <label>方案名称（保存后可在 DFM 表单页一键生成）</label>
+      <input type="text" id="inpSchemeName" placeholder="如：A12 后纵梁支架报告方案">
+      <label>说明（可选）</label>
+      <input type="text" id="inpSchemeDesc" placeholder="用途备注">
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+        <button class="pri" id="btnSchemeSave" style="flex:1">💾 保存方案</button>
+        <button class="sm dg" id="btnSchemeDelete">删除</button>
+      </div>
+      <label style="margin-top:6px">已保存方案（载入可二次编辑，或直接生成）</label>
+      <div style="display:flex;gap:6px">
+        <select id="selScheme" style="flex:1"></select>
+        <button class="sm" id="btnSchemeLoad">载入编辑</button>
+      </div>
+      <div class="hint" id="schemeHint" style="margin-top:4px"></div>
+    </div>
+
+    <div class="card">
+      <h3>③ 报告页面（要生成的页）</h3>
+      <button class="pri" id="btnReusePage" style="width:100%;margin-bottom:8px">从其他方案插入页面</button>
+      <div id="pageList" class="hint">加载模板后添加页面。</div>
+      <button class="sm" id="btnAddPage" style="margin-top:6px">＋ 新增一页（当前页号）</button>
+      <div style="margin-top:8px">
+        <button class="pri" id="btnGenerate" style="width:100%">⚡ 生成替换内容后的 PPT</button>
+      </div>
+      <div id="genStatus" class="hint" style="margin-top:6px"></div>
+    </div>
+  </div>
+
+  <!-- ============ 主区 ============ -->
+  <div>
+    <div class="card">
+      <div class="toolbar">
+        <label>模板页</label>
+        <select id="selPageNo" style="width:90px"></select>
+        <label>缩放</label>
+        <select id="selZoom" style="width:80px">
+          <option value="fit" selected>适应宽度</option><option value="0.5">50%</option><option value="0.75">75%</option>
+          <option value="1">100%</option><option value="1.25">125%</option>
+        </select>
+        <label><input type="checkbox" id="chkLivePreview" checked> 实时数据预览</label>
+        <label id="continuationControl" hidden>生成续页 <select id="selContinuation" aria-label="生成续页" style="width:110px"></select></label>
+        <span id="previewStatus" class="hint" role="status" aria-live="polite"></span>
+        <span class="spacer"></span>
+        <label style="margin:0">本页重复数组（可选，如 t.issues → 每条问题一页）</label>
+        <input type="text" id="inpRepeat" placeholder="t.issues" style="width:150px" title="重复页内点击对象时，可关联该行字段，如 desc / prop / st">
+        <label style="margin:0">显示条件（可选）</label>
+        <input type="text" id="inpCondition" placeholder="f.leakReq" style="width:120px">
+      </div>
+      <div class="hint" style="margin-bottom:6px">
+        页面按原 PPT 外观显示。直接点击对象即可绑定；首次绑定时系统会自动把当前模板页加入报告。
+        已绑定对象显示绿色 ✓；绑定关系属于当前「报告页面」。
+      </div>
+      <div id="canvasWrap"><div id="canvas"></div></div>
+      <div class="object-toolbar">
+        <label for="objectSearch">对象选择</label><input id="objectSearch" type="text" placeholder="搜索名称或文字">
+        <select id="selObject" aria-label="当前页对象"><option value="">在画布点击，或从列表选择对象</option></select>
+        <button id="btnSelectObject">编辑绑定</button>
+      </div>
+      <div class="hint" id="objectSummary">对象列表可以选中重叠对象、公式和表格单元格。</div>
+      <div id="selBar" style="display:none"></div>
+    </div>
+
+    <div class="card">
+      <h3>表单字段目录（先在页面上点选对象，再点下方字段 → 立即绑定）</h3>
+      <div class="hint">完整列出网页表单可填写的全部字段（含公司 LOGO 等图片槽位，始终可选）。
+        点任一字段即可绑定到已选中的对象；也可在弹层里手填路径。</div>
+      <div id="fieldHint"></div>
+    </div>
+  </div>
+</div>
+
+<div id="mask"><div class="box"><div class="spinner"></div>处理中…</div></div>
+<div class="toastbox" id="toast"></div>
+<dialog id="reusePageDialog" aria-labelledby="reusePageTitle">
+  <div class="dialog-title"><h2 id="reusePageTitle">从已保存方案复用一页</h2><button id="btnCloseReuse">关闭</button></div>
+  <p class="hint">复制该页及其绑定、公式和页面条件。当前报告保持不变，来源方案也不会被修改。</p>
+  <div class="reuse-grid"><div>
+    <label for="reuseScheme">来源方案</label><select id="reuseScheme"></select>
+    <label for="reuseSlide">方案中的页面</label><select id="reuseSlide"></select>
+    <label for="reusePosition">插入位置</label><select id="reusePosition"><option value="after">当前报告页之后</option><option value="end">报告末尾</option></select>
+    <p id="reuseDetails" class="hint"></p>
+  </div><div><div class="reuse-preview"><img id="reusePreviewImage" alt="待复用页面预览" hidden></div><p id="reuseStatus" class="hint" role="status"></p></div></div>
+  <div class="dialog-footer"><span class="hint" style="flex:1">插入的是独立副本，可在当前方案继续编辑。</span><button class="pri" id="btnConfirmReuse" disabled>插入这一页</button></div>
+</dialog>
+
+<script src="/static/dfm_catalog.js"></script>
+<script src="/static/editor_models.js"></script>
+<script>
+"use strict";
+/* =========================================================================
+ *  可视化点选绑定工作台
+ *  state.deck[i] = {source, repeat, condition, bindings: {key: spec}}
+ *  spec = {type:'text'|'image'|'table_cell', source, shape, options?:{row,column}}
+ * ========================================================================= */
+var state = {template:null, baseTemplate:null, data:null, inspect:null, scan:null, deck:[], current:0, previewSource:1, previewVersion:0};
+var LS_KEY = 'dfm_workbench_deck_v1';
+var CANVAS_W = 1000; // 设计宽度(px)，EMU->px 由缩放换算
+var CAT = window.DFM_CATALOG || {fields:[],tables:{},images:{},derived:{},results:{}};
+
+/* ---------- 字段中文翻译：项目信息.封面信息.项目名称（参考格式） ---------- */
+function fieldMeta(path){
+  if(path.indexOf('f.')===0){
+    var f=CAT.fields.find(function(x){return x.path===path;});
+    if(f)return {label:f.label, pathLabel:f.module+'.'+f.group+'.'+f.label};
+  }else if(path.indexOf('i.')===0){
+    var mm=path.match(/^i\.(\w+)(\[0\])?$/);
+    if(mm&&CAT.images[mm[1]]){var im=CAT.images[mm[1]];
+      return {label:im.label, pathLabel:im.module+'.'+im.group+'.'+im.label};}
+  }else if(path.indexOf('derived.')===0){
+    var d=path.slice(8);
+    if(CAT.derived[d])return {label:CAT.derived[d], pathLabel:'自动派生.'+CAT.derived[d]};
+  }else if(path.indexOf('calc_results.')===0){
+    var cm=path.match(/^calc_results\.(\w+)\.verdict$/);
+    if(cm&&CAT.results[cm[1]])return {label:CAT.results[cm[1]], pathLabel:'计算结论.'+CAT.results[cm[1]]};
+  }else if(path.indexOf('t.')===0){
+    var tm=path.match(/^t\.(\w+)(?:\[\d+\])?(?:\.([^.]+))?$/);
+    if(tm&&CAT.tables[tm[1]]){var tb=CAT.tables[tm[1]];
+      if(tm[2]&&tb.columns[tm[2]])return {label:tb.columns[tm[2]], pathLabel:tb.module+'.'+tb.group+'.'+tb.label+' · '+tb.columns[tm[2]]};
+      return {label:tb.label, pathLabel:tb.module+'.'+tb.group+'.'+tb.label};}
+  }
+  return null;
+}
+function repeatTableName(page){
+  page=page||currentPage();
+  if(!page||!page.repeat)return '';
+  var m=(page.repeat||'').match(/^t\.(\w+)$/);return m?m[1]:'';
+}
+function repeatTableMeta(page){
+  var name=repeatTableName(page);
+  return name?(CAT.tables[name]||null):null;
+}
+function metaFor(path,page){
+  page=page||currentPage();
+  var m=fieldMeta(path);
+  if(m)return m;
+  if(page&&page.repeat){
+    var tb=repeatTableMeta(page);
+    if(tb&&tb.columns[path])return {label:tb.columns[path],pathLabel:tb.module+'.'+tb.group+'.'+tb.label+' · '+tb.columns[path]};
+  }
+  return null;
+}
+function labelOf(path,page){
+  var meta=metaFor(path,page);
+  return meta?meta.pathLabel:path;
+}
+function metaOf(path,page){return metaFor(path,page)||{label:path,pathLabel:path};}
+
+function $(s){return document.querySelector(s);}
+function $$(s){return Array.prototype.slice.call(document.querySelectorAll(s));}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(m){var t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(function(){t.style.display='none';},2800);}
+function mask(on){$('#mask').classList[on?'add':'remove']('on');}
+async function api(path,opts){var r=await fetch(path,opts);if(!r.ok){var m='请求失败 ('+r.status+')';try{var e=await r.json();if(e.detail)m=e.detail;}catch(_){ }throw new Error(m);}return r;}
+
+/* ---------------- 模板 / 数据加载 ---------------- */
+async function refreshTemplates(){
+  var r=await api('/api/templates');var list=(await r.json()).templates;
+  $('#selTemplate').innerHTML=list.map(function(t){
+    return '<option value="'+esc(t.template_id)+'">'+esc(t.template_id+(t.origin==='uploaded'?'（已上传）':'（内置）'))+'</option>';}).join('');
+}
+$('#btnRefreshTemplates').addEventListener('click',refreshTemplates);
+
+function slidesOf(){return ((state.inspect||{}).slides)||[];}
+function shapesOf(slideNo){var s=slidesOf().find(function(x){return x.slide_index===slideNo;});return s?s.shapes:[];}
+function shapeKey(sh){return sh&&sh.shape_id?('shape:'+sh.shape_id):(sh?sh.shape_name:'');}
+function currentPage(){return state.deck[state.current];}
+function editablePage(){
+  var cp=currentPage();
+  return cp&&cp.template===state.template&&cp.source===state.previewSource?cp:null;
+}
+function ensureEditablePage(){
+  var cp=editablePage();if(cp)return cp;
+  var index=state.deck.findIndex(function(p){return p.template===state.template&&p.source===state.previewSource;});
+  if(index>=0){
+    state.current=index;cp=state.deck[index];
+  }else{
+    cp={source:state.previewSource,template:state.template,repeat:'',condition:'',bindings:{}};
+    state.deck.push(cp);state.current=state.deck.length-1;
+    if(!state.baseTemplate)state.baseTemplate=state.template;
+    toast('已把模板 '+state.template+' 第 '+state.previewSource+' 页加入报告，可直接绑定');
+  }
+  persistDeck();renderPageList();
+  $('#inpRepeat').disabled=false;$('#inpCondition').disabled=false;
+  return cp;
+}
+
+async function loadData(){
+  var which=$('#selData').value;
+  var version=(state.dataRequest||0)+1;state.dataRequest=version;
+  var loaded;
+  if(which==='demo')loaded=await (await api('/api/demo')).json();
+  else if(which==='project')loaded=await (await api('/api/project/load')).json();
+  else loaded={f:{},t:{},i:{}};
+  var calc=await api('/api/calc',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({f:loaded.f||{},t:loaded.t||{},apply_machine:false})}).then(function(r){return r.json();});
+  if(state.dataRequest!==version)return false;
+  loaded.derived=calc.derived;loaded.calc_results={};
+  Object.keys(calc.results).forEach(function(k){loaded.calc_results[k]={verdict:calc.results[k].verdict};});
+  state.data=loaded;
+  renderFieldHint();
+  return true;
+}
+
+async function loadTemplate(deckPages){
+  var id=$('#selTemplate').value;mask(true);
+  try{
+    if(!state.data){await loadData();}
+    var scan=await api('/api/template/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:id})}).then(function(r){return r.json();});
+    var insp=await api('/api/template/inspect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:id})}).then(function(r){return r.json();});
+    state.template=id;state.scan=scan;state.inspect=insp;state.previewVersion=Date.now();
+    $('#tplHint').innerHTML='页数 <b>'+insp.slide_count+'</b> ｜ 画布 '+(insp.slide_width/914400).toFixed(1)+' × '+(insp.slide_height/914400).toFixed(2)+' in'
+      + (scan.placeholder_count?' ｜ 占位符 '+scan.placeholder_count+' 个':'');
+    var pn=$('#selPageNo');pn.innerHTML=slidesOf().map(function(s){return '<option value="'+s.slide_index+'">第 '+s.slide_index+' 页（'+s.shapes.length+' 对象）</option>';}).join('');
+    if(deckPages&&deckPages.length){
+      state.deck=deckPages.map(function(d){return normalizeDeckPage(d);});
+      state.current=0;
+      state.previewSource=state.deck[0].source;
+      toast('已载入方案，可继续编辑');
+    }else if(!state.deck.length){
+      // 首次进入：给一个默认页；之后切换模板不再清空已有页面
+      state.deck=[{source:parseInt(pn.value,10)||1,template:id,repeat:'',condition:'',bindings:{}}];
+      state.baseTemplate=id;
+      state.current=0;
+      state.previewSource=state.deck[0].source;
+      toast('模板加载完成：'+id+'（切换模板不会清空已有页面）');
+    }else{
+      var cp=currentPage();
+      state.previewSource=(cp&&cp.template===id)?cp.source:(parseInt(pn.value,10)||1);
+      toast('已切换模板到：'+id+'（已有页面与绑定保留，新页面将来自该模板）');
+    }
+    persistDeck();renderPageList();renderPage();renderFieldHint();
+  }catch(e){toast('加载失败：'+e.message);}
+  mask(false);
+}
+/* 切换到某模板做预览（不改变 deck） */
+async function switchTemplatePreview(tid){
+  if(tid===state.template)return;
+  $('#selTemplate').value=tid;
+  await loadTemplate();
+}
+/* 把存储页（后端 deck 结构）规范为编辑器页结构 */
+function normalizeDeckPage(d){
+  var page={source:parseInt(d.source,10)||1,template:d.template||state.template,
+    repeat:d.repeat||'',condition:d.condition||'',bindings:{},images:EditorModels.copy(d.images||{}),_editorId:crypto.randomUUID()};
+  var bd=d.bindings||{};
+  Object.keys(bd).forEach(function(k){var b=bd[k];if(!b)return;
+    var spec={type:b.type||'text',source:b.source,shape:b.shape||k,required:(b.required!==false)};
+    if(b.options)spec.options=EditorModels.copy(b.options);
+    page.bindings[k]=spec;});
+  return page;
+}
+$('#btnLoadTpl').addEventListener('click',function(){ loadTemplate(); });
+
+$('#fileUpload').addEventListener('change',async function(e){
+  var file=e.target.files[0];if(!file)return;
+  var fd=new FormData();fd.append('file',file);mask(true);
+  try{
+    var r=await api('/api/templates/upload?template_id='+encodeURIComponent(file.name.replace(/\.pptx?$/i,'')),{method:'POST',body:fd});
+    var out=await r.json();toast('导入成功：'+out.template.template_id+'（'+out.slide_count+' 页）');
+    await refreshTemplates();$('#selTemplate').value=out.template.template_id;
+    await loadTemplate();
+  }catch(err){toast('导入失败：'+err.message);}mask(false);e.target.value='';
+});
+
+/* ---------------- 页面列表（deck） ---------------- */
+function persistDeck(){try{localStorage.setItem(LS_KEY,JSON.stringify({template:state.template,baseTemplate:state.baseTemplate,deck:state.deck}));}catch(_){ } }
+function renderPageList(){
+  var box=$('#pageList');
+  if(!state.deck.length){box.innerHTML='<div class="hint">暂无页面。加载模板后，在上方选择页号、配置绑定，再点「＋ 新增一页」加入报告。</div>';return;}
+  box.innerHTML='';
+  state.deck.forEach(function(p,i){
+    var chips=Object.keys(p.bindings||{}).map(function(k){
+      var b=p.bindings[k];
+      var where=b.shape;
+      if(b.type==='table_cell')where+=('['+(b.options.row+1)+','+(b.options.column+1)+']');
+      if(where.indexOf('_')>=0){var segs=where.split('_');where=segs[segs.length-1];}
+      var srcLabel=labelOf(b.source,p);
+      if(b.type==='text_replace')srcLabel='局部替换 '+(b.options.replacements||[]).length+' 处';
+      var shown=where+' ← '+srcLabel;
+      var tip=b.shape+(b.type==='table_cell'?('['+(b.options.row+1)+','+(b.options.column+1)+']'):'')+' ← '+b.source+'（'+srcLabel+'）';
+      return '<span class="binding-chip" title="'+esc(tip)+'">'+esc(shown)+'</span>';
+    }).join(' ');
+    var el=document.createElement('div');
+    el.className='page-item'+(i===state.current?' cur':'');
+    var tplTag=(p.template&&p.template!==state.template)?' <span style="color:#55637a">模板 '+esc(p.template)+'</span>':'';
+    el.innerHTML='<div><span class="pno">报告第 '+(i+1)+' 页</span><span class="hint"> · '+esc(p.template||state.template)+' / 原第 '+p.source+' 页</span>'
+      +(p.repeat?' <span class="badge" style="color:#c25200">repeat: '+esc(p.repeat)+'</span>':'')
+      +(p.condition?' <span style="color:#55637a">if '+esc(p.condition)+'</span>':'')
+      +(i===state.current&&editablePage()?' <span style="float:right;font-size:10.5px;color:#c25200">正在编辑</span>':'')
+      +'</div>'
+      +'<div style="margin-top:2px">'+(chips||'<span class="hint">未绑定（占位符页可自动填充）</span>')+'</div>'
+      +'<div class="page-tools"><button class="sm move-page" data-i="'+i+'" data-delta="-1" '+(i===0?'disabled':'')+'>上移</button><button class="sm move-page" data-i="'+i+'" data-delta="1" '+(i===state.deck.length-1?'disabled':'')+'>下移</button><button class="sm dg del-page" data-i="'+i+'">从报告移除</button></div>';
+    bindPageItemClick(el,i);
+    box.appendChild(el);
+  });
+}
+$('#btnAddPage').addEventListener('click',function(){
+  var source=parseInt($('#selPageNo').value,10)||state.previewSource||1;
+  state.deck.push({source:source,
+    template:state.template,repeat:'',condition:'',bindings:{}});
+  state.current=state.deck.length-1;state.previewSource=source;
+  persistDeck();renderPageList();renderPage();renderFieldHint();
+  toast('已新增一页（模板 '+state.template+' 第 '+state.deck[state.current].source+' 页），可在画布上点对象绑定');
+});
+/* 页面列表点击（切换到该页编辑；跨模板自动切换预览） */
+function bindPageItemClick(el, i){
+  el.addEventListener('click', async function(ev){
+    if(ev.target.closest('.del-page,.move-page'))return;
+    var p=state.deck[i];
+    state.current=i;
+    if(p&&p.template&&p.template!==state.template){ await switchTemplatePreview(p.template); }
+    state.previewSource=p.source;
+    persistDeck();renderPageList();renderPage();renderFieldHint();
+  });
+}
+/* 删除页（事件委托） */
+$('#pageList').addEventListener('click',async function(e){
+  var b=e.target.closest('.del-page');if(!b)return;
+  rememberBindingDraft();var active=currentPage();
+  var i=+b.getAttribute('data-i');state.deck.splice(i,1);
+  state.current=state.deck.includes(active)?state.deck.indexOf(active):Math.max(0,Math.min(i,state.deck.length-1));
+  var cp=currentPage();
+  if(cp){
+    if(cp.template&&cp.template!==state.template)await switchTemplatePreview(cp.template);
+    state.previewSource=cp.source;
+  }
+  persistDeck();renderPageList();renderPage();renderFieldHint();
+});
+
+/* ---------------- 页面画布 ---------------- */
+function loadCanvasPreview(canvas, cp, source){
+  var pageKey=state.template+':'+source+':'+(cp&&cp._editorId||state.current);
+  if(state.continuationKey!==pageKey){state.continuationKey=pageKey;state.continuationPage=1;}
+  var token=(canvas._previewToken||0)+1;
+  canvas._previewToken=token;
+  if(canvas._previewAbort)canvas._previewAbort.abort();
+  clearTimeout(canvas._previewTimer);
+  var controller=new AbortController();canvas._previewAbort=controller;
+  var status=$('#previewStatus');
+  canvas.classList.remove('real-preview');canvas.style.backgroundImage='none';
+  if(canvas._previewObjectUrl){URL.revokeObjectURL(canvas._previewObjectUrl);canvas._previewObjectUrl=null;}
+  var originalUrl='/api/templates/'+encodeURIComponent(state.template)+'/slides/'+source+'/preview.png?v='+state.previewVersion;
+  function showImage(url, message, isBlob){
+    var img=new Image();
+    img.onload=function(){
+      if(canvas._previewToken!==token){if(isBlob)URL.revokeObjectURL(url);return;}
+      canvas._previewObjectUrl=isBlob?url:null;
+      canvas.style.backgroundImage='url("'+url+'")';canvas.classList.add('real-preview');
+      status.textContent=message;
+    };
+    img.onerror=function(){
+      if(isBlob)URL.revokeObjectURL(url);
+      if(canvas._previewToken!==token)return;
+      if(isBlob)showImage(originalUrl,'数据预览图片加载失败，当前显示原模板',false);
+      else status.textContent='原页预览不可用，当前仅显示对象选区';
+    };
+    img.src=url;
+  }
+  if(!$('#chkLivePreview').checked){
+    $('#continuationControl').hidden=true;
+    status.textContent='正在加载原模板…';showImage(originalUrl,'原模板预览',false);return;
+  }
+  status.textContent='正在生成数据预览…';
+  var payload={template:state.template,slide:serializeDeckPage(cp||{source:source}),data:state.data||{},page:state.continuationPage||1};
+  canvas._previewTimer=setTimeout(async function(){
+    try{
+      var res=await fetch('/api/template/live-preview',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload),signal:controller.signal});
+      if(!res.ok){
+        var err=await res.json().catch(function(){return {};});
+        throw new Error(typeof err.detail==='string'?err.detail:'HTTP '+res.status);
+      }
+      var blob=await res.blob();
+      if(canvas._previewToken!==token)return;
+      var skipped=Number(res.headers.get('x-dfm-preview-skipped'))||0;
+      var pages=Number(res.headers.get('x-dfm-preview-pages'))||1;
+      state.continuationPage=Number(res.headers.get('x-dfm-preview-page'))||1;
+      $('#continuationControl').hidden=pages<2;
+      $('#selContinuation').innerHTML=Array.from({length:pages},function(_,i){return '<option value="'+(i+1)+'">第 '+(i+1)+' / '+pages+' 页</option>';}).join('');
+      $('#selContinuation').value=state.continuationPage;
+      showImage(URL.createObjectURL(blob),'实时数据预览'+(cp&&cp.repeat?'（重复数组首条数据）':'')
+        +(pages>1?' · 自动分页 '+state.continuationPage+'/'+pages:'')
+        +(skipped?' · '+skipped+' 处缺少数据，保留原内容':''),true);
+    }catch(e){
+      if(e.name==='AbortError'||canvas._previewToken!==token)return;
+      $('#continuationControl').hidden=true;
+      showImage(originalUrl,'数据预览失败，当前显示原模板：'+e.message,false);
+    }
+  },250);
+}
+function renderPage(){
+  rememberBindingDraft();
+  var cp=editablePage();
+  var source=state.previewSource||1;
+  $('#selPageNo').value=source;
+  $('#inpRepeat').value=cp?(cp.repeat||''):'';$('#inpCondition').value=cp?(cp.condition||''):'';
+  $('#inpRepeat').disabled=!cp;$('#inpCondition').disabled=!cp;
+  var s=slidesOf().find(function(x){return x.slide_index===source;});
+  var canvas=$('#canvas');
+  if(!s){
+    canvas._previewToken=(canvas._previewToken||0)+1;
+    if(canvas._previewAbort)canvas._previewAbort.abort();clearTimeout(canvas._previewTimer);
+    if(canvas._previewObjectUrl)URL.revokeObjectURL(canvas._previewObjectUrl);
+    canvas._previewObjectUrl=null;canvas.classList.remove('real-preview');canvas.style.backgroundImage='none';
+    $('#previewStatus').textContent='';
+    canvas.innerHTML='<div class="hint" style="padding:20px">该页不存在。</div>';hideSelBar();return;
+  }
+  var zoom=$('#selZoom').value==='fit'?Math.min(1,Math.max(.2,($('#canvasWrap').clientWidth-28)/CANVAS_W)):(parseFloat($('#selZoom').value)||0.75);
+  var scale=CANVAS_W/state.inspect.slide_width;
+  var W=Math.round(state.inspect.slide_width*scale),H=Math.round(state.inspect.slide_height*scale);
+  canvas.style.width=(W*zoom)+'px';canvas.style.height=(H*zoom)+'px';
+  loadCanvasPreview(canvas,cp,source);
+  function px(v){return v*scale*zoom;}
+  var html='';
+  var ordered=s.shapes.slice().sort(function(a,b){return a.z_order-b.z_order;});
+  ordered.forEach(function(sh){
+    if(!sh.width&&!sh.height&&sh.kind!=='group')return;
+    if(sh.kind==='group'){
+      html+=boxHtml(sh.kind,sh.shape_name,sh.shape_id,sh.left,sh.top,sh.width,sh.height,'组合对象（组内子对象已单独列出，可单独点选）',zoom,scale);
+      return;
+    }
+    if(sh.kind==='table'){
+      var tableKey=shapeKey(sh);
+      html+='<div class="sbox k-table tbl-frame" data-bindkey="'+esc(tableKey)+'" data-kind="table" data-name="'+esc(sh.shape_name)+'" data-shapeid="'+sh.shape_id+'" style="left:'+px(sh.left)+'px;top:'+px(sh.top)+'px;width:'+px(sh.width)+'px;height:'+px(sh.height)+'px;z-index:'+sh.z_order+'">'
+        +'<div class="tagline">表格 '+esc(sh.shape_name)+'（点击单元格逐个绑定）</div>';
+      (sh.cells||[]).forEach(function(c){
+        var key=tableKey+'#'+c.row+'x'+c.column;
+        var bnd=isCellBound(cp,c.row,c.column,sh);
+        html+='<div class="k-cell'+(bnd?' bound':'')+'" data-bindkey="'+esc(key)+'" data-row="'+c.row+'" data-col="'+c.column+'" data-name="'+esc(sh.shape_name)+'" data-shapeid="'+sh.shape_id+'"'
+          +' style="left:'+(px(c.left-sh.left))+'px;top:'+(px(c.top-sh.top))+'px;width:'+(px(c.width)-1)+'px;height:'+(px(c.height)-1)+'px">'
+          +esc(c.text||'')+'</div>';
+      });
+      html+='</div>';
+      return;
+    }
+    var inner;
+    if(sh.kind==='picture')inner='🖼 图片：'+esc(sh.shape_name);
+    else if(sh.kind==='text')inner=esc(sh.text||sh.shape_name).replace(/\{([^}]+)\}/g,'<span class="ph">{$1}</span>');
+    else inner=esc(sh.shape_name||sh.kind);
+    html+=boxHtml(sh.kind,sh.shape_name,sh.shape_id,sh.left,sh.top,sh.width,sh.height,inner,zoom,scale);
+  });
+  canvas.innerHTML=html;
+  Object.values(cp&&cp.bindings||{}).filter(function(b){return b.type==='table_rows';}).forEach(function(b){
+    $$('#canvas .k-table').forEach(function(el){if(b.options&&b.options.shape_id?String(b.options.shape_id)===el.dataset.shapeid:b.shape===el.dataset.name)el.classList.add('paginated-table');});
+  });
+  markBound(cp||{bindings:{}});
+  hideSelBar();
+  refreshObjectNavigator();
+}
+function boxHtml(kind,name,shapeId,l,t,w,h,inner,zoom,scale){
+  function px(v){return v*scale*zoom;}
+  var cls='k-other';
+  if(kind==='text')cls='k-text';
+  else if(kind==='picture')cls='k-picture';
+  else if(kind==='group')cls='k-group';
+  return '<div class="sbox '+cls+'" data-bindkey="'+esc(shapeId?('shape:'+shapeId):name)+'" data-kind="'+esc(kind)+'" data-name="'+esc(name)+'" data-shapeid="'+shapeId+'"'
+    +' style="left:'+px(l)+'px;top:'+px(t)+'px;width:'+Math.max(px(w),4)+'px;height:'+Math.max(px(h),4)+'px">'
+    +'<div class="tagline">'+esc(name)+'</div>'
+    +(inner?'<div class="inner">'+inner+'</div>':'')+'</div>';
+}
+function markBound(cp){
+  $$('#canvas .k-table').forEach(function(el){
+    if(EditorModels.tableBinding(cp.bindings,{name:el.dataset.name,shape_id:el.dataset.shapeid}))el.classList.add('bound');
+  });
+  Object.keys(cp.bindings||{}).forEach(function(k){
+    var b=cp.bindings[k];
+    var els=$$('#canvas [data-bindkey="'+CSS.escape(k)+'"]');
+    els.forEach(function(el){el.classList.add('bound');});
+  });
+  $$('#canvas .k-cell').forEach(function(el){
+    var key=el.getAttribute('data-bindkey');
+    if(cp.bindings[key])el.classList.add('bound');
+  });
+}
+function isCellBound(cp,r,c,shape){
+  var key=shapeKey(shape)+'#'+r+'x'+c;
+  return !!(cp&&cp.bindings&&cp.bindings[key]);
+}
+/* 点击事件：委托到 canvas */
+$('#canvas').addEventListener('click',function(e){
+  var el=e.target.closest('.sbox,.k-cell');if(!el)return;
+  selectCanvasObject(el);
+});
+function selectCanvasObject(el){
+  rememberBindingDraft();
+  var cp=ensureEditablePage();
+  // 清空选中
+  $$('#canvas .sel').forEach(function(x){x.classList.remove('sel');});
+  var name=el.getAttribute('data-name'),kind=el.getAttribute('data-kind');
+  var shapeId=+(el.getAttribute('data-shapeid')||0);
+  if(el.classList.contains('k-cell')){
+    var key=el.getAttribute('data-bindkey');var row=+el.getAttribute('data-row'),col=+el.getAttribute('data-col');
+    el.classList.add('sel');
+    var text='';var tbl=slidesOf().find(function(s){return s.slide_index===cp.source;});
+    var sh=tbl&&tbl.shapes.find(function(x){return shapeId?x.shape_id===shapeId:x.shape_name===name;});
+    if(sh){var c=(sh.cells||[]).find(function(x){return x.row===row&&x.column===col;});if(c)text=c.full_text===undefined?c.text:c.full_text;}
+    showSelBar({type:'table_cell',name:name,shape_id:shapeId,row:row,col:col,text:text,key:key,
+      kindLabel:'表格单元格（第'+(row+1)+'行 第'+(col+1)+'列）',
+      kind:'表格单元格（第'+(row+1)+'行 第'+(col+1)+'列）'});
+  }else if(kind==='table'){
+    el.classList.add('sel');
+    showSelBar({type:'table_rows',name:name,shape_id:shapeId,kindLabel:'表格',key:el.getAttribute('data-bindkey'),
+      text:(el.querySelector('.tagline')||{}).textContent||''});
+  }else{
+    el.classList.add('sel');
+    var shape=shapesOf(cp.source).find(function(x){return x.shape_id===shapeId;});
+    showSelBar({type:kind==='picture'?'image':(kind==='ole'?'formula':'text'),kind:kind,name:name,shape_id:shapeId,kindLabel:kind,text:shape?(shape.full_text===undefined?shape.text:shape.full_text):'',key:el.getAttribute('data-bindkey')});
+  }
+  syncObjectSelection(el.getAttribute('data-bindkey'));
+}
+function showSelBar(info){
+  if(info.type==='table_rows'){
+    var savedTable=EditorModels.tableBinding(currentPage().bindings,info);
+    var tableDraft=(state.bindingDrafts||{})[bindingDraftKey(info)];
+    var tableSource=tableDraft&&tableDraft.table||(savedTable&&savedTable.binding.source.replace(/^t\./,''));
+    if(tableSource&&CAT.tables[tableSource]){applyTableRows(info,tableSource);return;}
+  }
+  var bar=$('#selBar');bar.style.display='block';
+  bar._mapTbl=null;
+  var existing=currentPage().bindings[info.key];
+  if(info.type==='table_cell'&&existing&&existing.type==='table_cell'&&EditorModels.isImageSource(existing.source,resolvePath(existing.source))){
+    existing=Object.assign({},existing,{type:'image_region'});
+  }
+  var existingTemplate=existing&&existing.options?existing.options.template:'';
+  state.partialDrafts=state.partialDrafts||{};
+  bar._partialDraftKey=bindingDraftKey(info);
+  var cached=state.partialDrafts[bar._partialDraftKey];
+  bar._partialDraft=cached&&cached.original===info.text?JSON.parse(JSON.stringify(cached.rows)):
+    (existing&&existing.type==='text_replace'?JSON.parse(JSON.stringify(existing.options.replacements||[])):[]);
+  bar._partialRange=null;
+  var chips='';
+  var phs=collectPlaceholders(info.name,info.shape_id);
+  chips=phs.map(function(p){
+    var meta=fieldMeta(p);
+    var txt=meta?meta.pathLabel:p;
+    return '<button class="chip-btn" data-path="'+esc(p)+'" title="'+esc(p)+'">'+esc(txt)+'</button>';
+  }).join(' ');
+  var chipsLabel='该对象对应占位符/常用字段（点选即填）：';
+  if(info.type==='table_rows'){
+    // 表格对象：整表填入表单的表格数据（dfmHist / fileStat / matList / issues …）
+    var tblNames=Object.keys(CAT.tables);
+    chips=tblNames.map(function(name){
+      var tb=CAT.tables[name];
+      return '<button class="chip-btn" data-tbl="'+esc(name)+'" title="t.'+esc(name)+'（'+esc(tb.label)+'）">'
+        +'整表填入：'+esc(tb.module+'.'+tb.group+' · '+tb.label)+'</button>';
+    }).join(' ');
+    chipsLabel='请选择要填入此表格的表单数据（按表头列自动对应，多行自动增删行）：';
+  } else if(info.type==='image'){
+    // 图片对象：优先推荐“当前表单数据里已有图”的图片字段（示例数据下即公司 LOGO）
+    var withImg=Object.keys(CAT.images).filter(function(k){
+      var arr=(state.data&&state.data.i)?state.data.i[k]:null;
+      return Array.isArray(arr)&&arr.some(function(v){return v&&String(v).indexOf('data:')===0;});
+    });
+    var rec=withImg.map(function(k){
+      var path=CAT.images[k].path;
+      var m=metaOf(path);
+      return '<button class="chip-btn" data-path="'+esc(path)+'" title="'+esc(path)+'">'+esc(m.pathLabel)+'</button>';
+    });
+    chips=(rec.join(' ')+' '+(chips||'')).trim();
+    chipsLabel='当前数据已有图片，可直接绑定（点选即绑）：';
+  }
+  var labelText=({image:'图片',picture:'图片',text:'文本框',ole:'公式',group:'组合'})[info.kindLabel]||(info.kindLabel||'对象');
+  bar.innerHTML='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    +'<b style="color:#c25200">已选中：'+esc(labelText)+' '+esc(info.name)+'</b>'
+    +'<span class="hint">'+esc(info.text?info.text.slice(0,60):'')+'</span>'
+    +'<span class="spacer" style="flex:1"></span>'
+    +'<button class="sm" id="btnDiscardDraft">撤销未保存修改</button>'
+    +'<button class="sm dg" id="btnUnbind">解除绑定</button>'
+    +'<button class="sm" id="btnCloseSel">收起</button></div><div id="bindingDraftStatus" class="editor-status" aria-live="polite"></div>'
+    +'<table><tr id="rowSingleSource"><td style="width:130px">关联表单字段（中文名）</td><td>'
+    +'<input type="text" id="inpSource" list="fieldList" placeholder="点击下方建议，或输入/选择字段路径" style="width:100%" value="'+esc(existing?existing.source:'')+'">'
+    +'<datalist id="fieldList">'+fieldOptions()+'</datalist>'
+    +(chips?'<div style="margin-top:3px"><span class="hint">'+esc(chipsLabel)+'</span>'+chips+'</div>':'')
+    +'<div class="hint" id="selHint"></div>'
+    +'</td></tr><tr><td>绑定方式</td><td><select id="selBindType">'
+    + bindTypeOptions(info.type)
+    +'</select></td></tr>'
+    +'<tr id="rowDisplayTemplate" style="display:none"><td>显示模板</td><td>'
+    +'<textarea id="inpDisplayTemplate" style="width:100%;min-height:72px;border:1px solid #d3dae4;border-radius:5px;padding:5px" placeholder="可组合多个字段，如：零件号:{f.partNo}\n材料:{f.material}">'+esc(existingTemplate)+'</textarea>'
+    +'<div class="hint">使用 {字段路径}；公式支持 [[分子|分母]]，例如 F = [[{f.aPart} × {f.castP}|10]]。</div></td></tr></table>'
+    +'<div id="partialEditor" style="display:none">'
+    +'<p>① 在下面的完整原文中，用鼠标或键盘选中要替换的文字（标签、单位等不要选）。</p>'
+    +'<textarea id="partialOriginal" aria-label="完整原文，选中要替换的文字" readonly>'+esc(info.text||'')+'</textarea>'
+    +'<div id="partialSelection" class="hint" role="status">尚未选中文字；相同文字可按所在位置分别绑定。</div>'
+    +'<label for="partialSearch">② 搜索字段中文名</label><input type="text" id="partialSearch" placeholder="如：零件号、成品重量、材料">'
+    +'<select id="partialField" aria-label="选择替换字段" style="margin-top:5px"></select>'
+    +'<button id="btnAddPartial" style="margin-top:6px">将选中文字关联到此字段</button>'
+    +'<div id="partialBindings"></div><label>③ 替换效果（绿色为当前数据；保存后刷新 PPT）</label>'
+    +'<div id="partialResult"></div></div>'
+    +'<div id="formulaEditor" style="display:none"></div>'
+    +'<button class="pri" id="btnBind" style="width:100%;margin-top:8px">✓ 保存绑定并预览</button>';
+  bar._info=info;
+  bar.querySelector('#inpSource').addEventListener('input',function(){updateSelHint(info);});
+  bar.querySelector('#selBindType').addEventListener('change',function(){toggleTemplateInput();updateSelHint(info);});
+  bar.querySelector('#btnCloseSel').addEventListener('click',function(){hideSelBar();});
+  bar.querySelector('#btnBind').addEventListener('click',function(){doBind(info);});
+  bar.querySelector('#btnUnbind').addEventListener('click',function(){unbind(info);});
+  bar.querySelector('#btnDiscardDraft').addEventListener('click',function(){clearBindingDraft(info);showSelBar(info);toast('已恢复为该对象上次保存的绑定');});
+  bar.querySelectorAll('.chip-btn').forEach(function(cb){cb.addEventListener('click',function(){
+    var tbl=cb.getAttribute('data-tbl');
+    if(tbl){applyTableRows(info,tbl);}else{bindNow(cb.getAttribute('data-path'), info);}
+  });});
+  if(existing&&existing.type)bar.querySelector('#selBindType').value=existing.type;
+  else if(info.text&&(info.type==='text'||info.type==='table_cell'))bar.querySelector('#selBindType').value='text_replace';
+  var original=bar.querySelector('#partialOriginal');
+  original.value=info.text||'';
+  function capturePartialSelection(){
+    var start=Array.from(this.value.slice(0,this.selectionStart)).length;
+    var end=Array.from(this.value.slice(0,this.selectionEnd)).length;
+    if(start===end)return;
+    bar._partialRange={start:start,end:end,text:Array.from(this.value).slice(start,end).join('')};
+    $('#partialSelection').textContent='已选中：「'+bar._partialRange.text+'」';
+  }
+  ['select','mouseup','keyup'].forEach(function(event){original.addEventListener(event,capturePartialSelection);});
+  $('#partialSearch').addEventListener('input',renderPartialFields);
+  $('#btnAddPartial').addEventListener('click',function(){addPartialBinding($('#partialField').value);});
+  renderPartialFields();renderPartialDraft();
+  restoreBindingDraft(info,existing);
+  toggleTemplateInput();updateSelHint(info);
+  syncObjectSelection(info.key);
+}
+function bindTypeOptions(type){
+  if(type==='table_rows')return '<option value="table_rows" selected>整表填入（按表头列自动对应，多行自动增删）</option>';
+  if(type==='image')return '<option value="image" selected>图片替换</option><option value="text">文本替换</option>';
+  if(type==='formula')return '<option value="formula" selected>动态公式图（替换 OLE）</option>';
+  if(type==='table_cell')return '<option value="text_replace">只替换选中文字（保留其余内容）</option><option value="table_cell" selected>替换整个单元格</option><option value="image_region">在所选单元格区域放入图片（等比完整显示）</option><option value="text_template">自定义整段文本（高级）</option>';
+  return '<option value="text_replace">只替换选中文字（保留其余内容）</option><option value="text" selected>替换整个文本框</option><option value="text_template">自定义整段文本（高级）</option><option value="image_region">作为图片区域替换</option>';
+}
+function toggleTemplateInput(){
+  var type=$('#selBindType')?$('#selBindType').value:'';
+  var row=$('#rowDisplayTemplate');if(row)row.style.display=type==='text_template'?'table-row':'none';
+  if($('#partialEditor'))$('#partialEditor').style.display=type==='text_replace'?'block':'none';
+  if($('#rowSingleSource'))$('#rowSingleSource').style.display=(type==='text_replace'||type==='formula')?'none':'table-row';
+  if($('#formulaEditor'))$('#formulaEditor').style.display=type==='formula'?'block':'none';
+  if(type==='text_template'&&!$('#inpDisplayTemplate').value)$('#inpDisplayTemplate').value=$('#selBar')._info.text||'';
+}
+function renderPartialFields(){
+  var query=$('#partialSearch').value.trim().toLowerCase();
+  var select=$('#partialField'),previous=select.value;
+  var entries=Array.from(new Set(Array.from($('#fieldList').options).map(function(o){return o.value;})))
+    .filter(function(path){return path.indexOf('i.')!==0&&!(path.indexOf('t.')===0&&!/\[\d+\]/.test(path));})
+    .filter(function(path){return (labelOf(path)+' '+path).toLowerCase().includes(query);});
+  select.innerHTML=entries.map(function(path){var value=resolvePath(path);return '<option value="'+esc(path)+'">'+esc(labelOf(path))+' — '+esc(value===undefined?'未填写':String(value).slice(0,45))+'</option>';}).join('')||'<option value="">没有匹配字段</option>';
+  if(entries.includes(previous))select.value=previous;
+}
+function addPartialBinding(path){
+  var bar=$('#selBar'),range=bar._partialRange;
+  if(!range){toast('请先在完整原文中选中要替换的文字');return;}
+  if(!path){toast('请选择字段');return;}
+  if(range.text.includes('\n')){toast('请逐行选择要替换的片段，不要跨行选择');return;}
+  var value=resolvePath(path);
+  if(value!==null&&typeof value==='object'||typeof value==='string'&&value.indexOf('data:image/')===0||path.indexOf('i.')===0){toast('请选择文字或数字字段，不能选择图片或整张表格');return;}
+  if(bar._partialDraft.some(function(r){return r.start<range.end&&r.end>range.start&&!(r.start===range.start&&r.end===range.end);})){toast('所选文字与已有绑定重叠，请先移除原绑定');return;}
+  bar._partialDraft=bar._partialDraft.filter(function(r){return r.start!==range.start||r.end!==range.end;});
+  bar._partialDraft.push(Object.assign({},range,{source:path}));
+  bar._partialDraft.sort(function(a,b){return a.start-b.start;});
+  renderPartialDraft();toast('已加入待保存绑定，可继续选择另一段文字');
+}
+function renderPartialDraft(){
+  var bar=$('#selBar'),rows=bar._partialDraft||[],text=Array.from(bar._info.text||'');
+  state.partialDrafts[bar._partialDraftKey]={original:bar._info.text,rows:JSON.parse(JSON.stringify(rows))};
+  $('#partialBindings').innerHTML=rows.map(function(r,i){var value=resolvePath(r.source);var missing=value===undefined||value===null||value==='';return '<div class="partial-row"><span style="flex:1">「'+esc(r.text)+'」 → '+esc(labelOf(r.source))+(missing?'（当前未填写，保留原文）':'')+'</span><button class="sm" data-remove-partial="'+i+'">移除此处</button></div>';}).join('');
+  $$('#partialBindings button').forEach(function(b){b.addEventListener('click',function(){rows.splice(Number(this.dataset.removePartial),1);renderPartialDraft();});});
+  var result='',cursor=0;
+  rows.forEach(function(r){var value=resolvePath(r.source);var missing=value===undefined||value===null||value==='';
+    result+=esc(text.slice(cursor,r.start).join(''))+'<mark title="'+esc(labelOf(r.source))+'">'+esc(missing?r.text:String(value))+'</mark>';
+    cursor=r.end;
+  });
+  $('#partialResult').innerHTML=result+esc(text.slice(cursor).join(''));
+  var saved=currentPage().bindings[bar._info.key];
+  var unchanged=saved&&saved.type==='text_replace'&&JSON.stringify(saved.options.replacements)===JSON.stringify(rows);
+  if(rows.length)$('#partialSelection').textContent=unchanged?'已保存 '+rows.length+' 处绑定，可继续选中文字修改。':'待保存 '+rows.length+' 处；点击下方“保存绑定并预览”后生效。';
+}
+/* 整表填入：先弹“列对应”映射面板（PPT 列 ← 表单表格列），确认后绑定 */
+function applyTableRows(info, tblName){
+  rememberBindingDraft();
+  var tb=CAT.tables[tblName];
+  if(!tb){toast('找不到表格数据定义：'+tblName);return;}
+  if(!info||info.type!=='table_rows'){toast('请先点选页面上的表格对象（整表），再选要填入的表格数据');return;}
+  // 读取该表格对象的列数与表头（来自画布对象清单）
+  var meta=null;
+  var shapes=shapesOf(currentPage().source);
+  shapes.some(function(s){if(info.shape_id!=null?String(s.shape_id)===String(info.shape_id):s.shape_name===info.name){meta=s;return true;}return false;});
+  var colCount=(meta&&meta.cols)||0;
+  if(!colCount){colCount=((meta&&meta.cells)||[]).reduce(function(m,c){return Math.max(m,c.column+1);},0);}
+  var headers={};
+  ((meta&&meta.cells)||[]).forEach(function(c){ if(c.row===0&&headers[c.column]===undefined) headers[c.column]=(c.text||'').trim(); });
+  var dataCols=Object.keys(tb.columns); // 顺序 = 表单列
+  function norm(s){return String(s||'').replace(/\s+/g,'').toLowerCase();}
+  // 自动匹配：表头文本 == 表单列中文名（忽略空格/大小写）；无表头则按列序
+  function autoKey(col){
+    var h=headers[col]||'';
+    if(h){ var nh=norm(h);
+      for(var i=0;i<dataCols.length;i++){ if(norm(tb.columns[dataCols[i]])===nh) return dataCols[i]; } }
+    if(!h && col<dataCols.length && !Object.keys(headers).length) return dataCols[col];
+    return '';
+  }
+  var bar=$('#selBar');bar.style.display='block';
+  bar.oninput=null;bar.onchange=null;bar.onclick=null;
+  var previousEntry=EditorModels.tableBinding(currentPage().bindings,info);
+  var previous=previousEntry&&previousEntry.binding;
+  var prevOptions=previous&&previous.source==='t.'+tblName?previous.options||{}:{};
+  var dataCount = (state.data&&state.data.t&&state.data.t[tblName]) ? state.data.t[tblName].length : 0;
+  var unmapped=[];
+  var rowsHtml='';
+  for(var col=0;col<colCount;col++){
+    var opts='<option value="">— 不填此列 —</option>'+dataCols.map(function(k){
+      return '<option value="'+esc(k)+'">'+esc(tb.columns[k])+'（'+esc(k)+'）</option>';
+    }).join('');
+    var selVal=prevOptions.columns_map?(prevOptions.columns_map[col]||''):autoKey(col);
+    var hText=headers[col]||('第 '+(col+1)+' 列');
+    if(!selVal && headers[col])unmapped.push('第 '+(col+1)+' 列「'+headers[col]+'」');
+    rowsHtml+='<tr><td style="width:40%">PPT 第 '+(col+1)+' 列<span class="hint">（表头：'+esc(hText)+'）</span></td>'
+      +'<td><select class="mapcol" data-col="'+col+'" style="width:100%">'
+      +opts.replace('value="'+selVal+'"','value="'+selVal+'" selected')+'</select></td></tr>';
+  }
+  bar.innerHTML='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+    +'<b style="color:#c25200">整表填入：'+esc(tb.module+'.'+tb.group+'.'+tb.label)+'</b>'
+    +'<span class="hint">表格对象 '+esc(info.name)+'</span>'
+    +'<span class="spacer" style="flex:1"></span>'
+    +'<button class="sm" id="btnMapUnbind">解除绑定</button><button class="sm" id="btnMapDiscard">恢复已保存配置</button><button class="sm" id="btnMapCancel">关闭</button></div>'
+    +'<p id="bindingDraftStatus" role="status" class="hint"></p>'
+    +'<label for="selTableSource">表格数据来源</label><select id="selTableSource">'+Object.keys(CAT.tables).map(function(k){return '<option value="'+esc(k)+'"'+(k===tblName?' selected':'')+'>'+esc(CAT.tables[k].module+' · '+CAT.tables[k].group)+'</option>';}).join('')+'</select>'
+    +'<div class="hint" style="margin:4px 0">请逐列选择“PPT 列 ← 表单列”；表头一致已自动匹配，可手动修改，可“不填此列”。</div>'
+    +(unmapped.length?'<div class="bad" style="margin:2px 0">⚠ 以下列表头没自动匹配到表单列，请手动选择（如备注列）：'+esc(unmapped.join('；'))+'</div>':'')
+    +'<div style="margin:4px 0"><label style="display:inline">保留的表头/标题行数（不写入数据：普通表填 1；首行标题+表头填 2）</label>'
+    +'<input type="number" id="inpKeepRows" value="'+(prevOptions.start_row||1)+'" min="1" style="width:70px">'
+    +'<span class="hint"> ｜ 表单数据 '+esc(String(dataCount))+' 行 ｜ 模板表格共 '+esc(String(meta?meta.rows:0))+' 行'
+    +(dataCount?'（超出表格区域自动续页）':'')+'</span></div>'
+    +'<label for="inpStyleRow">样式参考行（PPT 中第几行；留空用表头后的第一行）</label><input type="number" id="inpStyleRow" min="1" value="'+(prevOptions.style_row===undefined?'':prevOptions.style_row+1)+'">'
+    +'<label for="inpRowsPerPage">每页数据行数（不含表头；留空自动）</label><input type="number" id="inpRowsPerPage" min="1" step="1" value="'+(prevOptions.rows_per_page||'')+'">'
+    +'<p class="hint">填 N：原表格数据区域等分为 N 行，超过 N 条自动续页；末页保持相同行高。留空：按参考行高度和文字自动计算。保留模板字号、列宽与表头；文字放不下会提示减少行数。修改后点击下方保存才生效。</p>'
+    +'<table style="width:100%">'+rowsHtml+'</table>'
+    +'<button class="pri" id="btnMapConfirm" style="width:100%;margin-top:6px">✓ 保存表格配置并预览</button>';
+  bar._info=info;bar._mapTbl=tblName;
+  bar._draftId=bindingDraftKey(info);bar._skipRemember=false;
+  var draft=(state.bindingDrafts||{})[bar._draftId];
+  bar._dirty=!!(draft&&draft.table===tblName);
+  if(bar._dirty){
+    $('#inpKeepRows').value=draft.keepRows;$('#inpStyleRow').value=draft.styleRow;$('#inpRowsPerPage').value=draft.rowsPerPage;
+    $$('#selBar .mapcol').forEach(function(el){el.value=draft.columns[el.dataset.col]||'';});
+  }
+  $('#bindingDraftStatus').textContent=bar._dirty?'已恢复未保存的表格配置，请保存后生成。':previous?'已加载保存的表格配置；修改后请保存并预览。':'请确认列对应和分页设置，再保存。';
+  bar.oninput=markBindingDirty;
+  bar.onchange=function(e){if(e.target.id!=='selTableSource')markBindingDirty();};
+  bar.querySelector('#selTableSource').addEventListener('change',function(){var value=this.value;applyTableRows(info,value);markBindingDirty();});
+  bar.querySelector('#btnMapDiscard').addEventListener('click',function(){clearBindingDraft(info);showSelBar(info);});
+  bar.querySelector('#btnMapUnbind').addEventListener('click',function(){unbind(info);});
+  bar.querySelector('#btnMapCancel').addEventListener('click',hideSelBar);
+  bar.querySelector('#btnMapConfirm').addEventListener('click',function(){ commitTableMapping(info,tblName); });
+}
+function commitTableMapping(info, tblName){
+  var map={};var any=false;
+  $$('#selBar .mapcol').forEach(function(sel){
+    var v=sel.value;
+    if(v){map[+sel.getAttribute('data-col')]=v;any=true;}
+  });
+  if(!any){toast('请至少给一列选择要填的表单数据');return;}
+  var keepRows=parseInt(($('#inpKeepRows')&&$('#inpKeepRows').value)||'1',10)||1;
+  if(keepRows<1)keepRows=1;
+  var cp=currentPage();if(!cp)return;
+  var tb=CAT.tables[tblName];
+  var styleValue=$('#inpStyleRow').value,limitValue=$('#inpRowsPerPage').value;
+  var styleRow=styleValue?Number(styleValue)-1:keepRows,limit=limitValue?Number(limitValue):0;
+  var shape=shapesOf(cp.source).find(function(s){return s.shape_id===info.shape_id;});
+  if(!Number.isInteger(styleRow)||styleRow<keepRows||(shape&&styleRow>=shape.rows)){toast('样式参考行必须在表头之后、模板表格范围之内');return;}
+  if(!Number.isInteger(limit)||(limitValue!==''&&limit<1)){toast('每页条数请填写正整数，或留空自动计算');return;}
+  // 引擎 start_row = 保留不写的表头/标题行数；数据从第 keepRows 行（0 起）之后开始
+  var previousEntry=EditorModels.tableBinding(cp.bindings,info);
+  cp.bindings[previousEntry?previousEntry.key:'rows:'+info.key]={type:'table_rows',source:'t.'+tblName,shape:info.name,required:true,
+    options:{columns_map:map,start_row:keepRows,shape_id:info.shape_id,paginate:true,style_row:styleRow,rows_per_page:limit}};
+  clearBindingDraft(info);state.continuationPage=1;
+  persistDeck();renderPageList();renderPage();
+  toast('已保存表格配置：'+(limit?'每页 '+limit+' 行（不含表头）':'自动分页')+'，正在刷新预览');
+}
+function updateSelHint(info){
+  var path=$('#inpSource').value.trim();
+  var hint=$('#selHint');
+  if(!path){hint.textContent='请输入/选择要关联的字段（见下方目录与建议）。';return;}
+  var meta=metaOf(path);
+  var val=resolvePath(path);
+  var isImgValue = (typeof val==='string' && /^data:image\//.test(val))
+    || (Array.isArray(val) && val.length && typeof val[0]==='string' && /^data:image\//.test(val[0]));
+  var warn='';
+  var type=$('#selBindType')?$('#selBindType').value:'text';
+  var curText=val===undefined?'（无/空）':(Array.isArray(val)?('数组 '+val.length+' 条'):(isImgValue?('（图片 '+val.length+' 字符）'):String(val).slice(0,120)));
+  if((type==='image'||type==='image_region') && typeof val==='string' && val!=='' && !/^data:image\//.test(val)){
+    warn='<div class="bad" style="margin-top:2px">⚠ 该字段当前是普通文本，不是图片（如公司名称/文字说明）。'
+      +'请改为：① 关联图片字段（值以 data:image 开头，如公司 LOGO / 分型图 / 问题图）；'
+      +'或 ② 把绑定方式改为“文本替换”。</div>';
+  }else if(type==='text' && isImgValue){
+    warn='<div class="bad" style="margin-top:2px">⚠ 该字段是图片内容，文本替换会把整段图片编码写进文本框。'
+      +'请改为“图片替换”，或绑定文字字段。</div>';
+  }
+  var html='<span class="ok">'+esc(meta.pathLabel)+'</span> <span class="mono">'+esc(path)+'</span>';
+  html+=' ｜ 当前值：'+esc(curText);
+  hint.innerHTML=html+warn;
+}
+function doBind(info){
+  if(info.type==='table_cell'&&EditorModels.isImageSource($('#inpSource').value.trim(),resolvePath($('#inpSource').value.trim()))&&$('#selBindType').value!=='text_replace')$('#selBindType').value='image_region';
+  if($('#selBindType').value==='formula'){saveFormulaBinding(info);return;}
+  if($('#selBindType').value==='text_replace'){
+    var rows=$('#selBar')._partialDraft;
+    if(!rows.length){toast('请先选择文字并添加至少一处绑定');return;}
+    var options={shape_id:info.shape_id,original_text:info.text,replacements:JSON.parse(JSON.stringify(rows))};
+    if(info.type==='table_cell'){options.row=info.row;options.column=info.col;}
+    currentPage().bindings[info.key]={type:'text_replace',source:'f',shape:info.name,required:true,options:options};
+    clearBindingDraft(info);persistDeck();renderPageList();renderPage();showSelBar(info);
+    toast('已保存 '+rows.length+' 处局部文本绑定，其余文字保留');return;
+  }
+  var path=$('#inpSource').value.trim();
+  if(!path){toast('请先选择要关联的字段');return;}
+  var cp=currentPage();
+  var selectedType=$('#selBindType').value;
+  var spec={type:selectedType,source:path,shape:info.name,required:true,options:{shape_id:info.shape_id}};
+  if(selectedType==='text_template'||selectedType==='formula'){
+    var displayTemplate=($('#inpDisplayTemplate')&&$('#inpDisplayTemplate').value)||'';
+    if(!displayTemplate.trim()){toast('请填写显示模板');return;}
+    spec.options.template=displayTemplate;
+  }
+  if(info.type==='table_cell'){
+    spec.type=EditorModels.cellBindingType(selectedType,path,resolvePath(path));
+    if(spec.type==='image_region')spec.options.fit='contain';
+    spec.options.row=info.row;spec.options.column=info.col;spec.shape=info.name;
+  }
+  if(info.type==='table_rows'){
+    var m=path.match(/^t\.(\w+)$/);
+    var tb2=m&&CAT.tables[m[1]];
+    if(!tb2){toast('请填写表格数据路径，如 t.dfmHist');return;}
+    applyTableRows(info,m[1]); // 打开列对应面板确认
+    return;
+  }
+  cp.bindings[info.key]=spec;
+  clearBindingDraft(info);persistDeck();renderPageList();renderPage();showSelBar(info);
+  toast('已绑定：'+info.name+' ← '+labelOf(path));
+}
+/* 单击字段即绑定：类型不匹配时提示并不绑 */
+function bindNow(path, info){
+  if(!info||$('#selBar').style.display==='none'){toast('请先在页面画布上点击要绑定的对象（标题/文本框/图片/表格单元格），再点字段');return false;}
+  var type=$('#selBindType').value;
+  if(info.type==='table_cell'&&EditorModels.isImageSource(path,resolvePath(path))){
+    $('#selBindType').value='image_region';$('#inpSource').value=path;
+    toggleTemplateInput();updateSelHint(info);doBind(info);return true;
+  }
+  if(type==='formula'){insertFormulaField(path);return true;}
+  if(type==='text_replace'){addPartialBinding(path);return true;}
+  var val=resolvePath(path);
+  var isImgVal=function(v){return (typeof v==='string'&&/^data:image\//.test(v))
+    ||(Array.isArray(v)&&v.length&&typeof v[0]==='string'&&/^data:image\//.test(v[0]));};
+  if((type==='image'||type==='image_region')&&typeof val==='string'&&val!==''&&!/^data:image\//.test(val)){
+    toast('该字段当前是普通文本，不是图片 —— 请改用文字字段，或把绑定方式改为“文本替换”');
+    return false;
+  }
+  if(type==='text'&&isImgVal(val)){
+    toast('该字段是图片内容 —— 请点选页面上的图片对象后绑定，或改用文字字段');
+    return false;
+  }
+  $('#inpSource').value=path;
+  updateSelHint(info);
+  doBind(info);
+  return true;
+}
+function unbind(info){
+  clearBindingDraft(info);
+  if(state.partialDrafts)delete state.partialDrafts[$('#selBar')._partialDraftKey];
+  var cp=currentPage(),entry=info.type==='table_rows'?EditorModels.tableBinding(cp.bindings,info):null,key=entry?entry.key:info.key;
+  if(cp.bindings[key]){delete cp.bindings[key];persistDeck();renderPageList();renderPage();}
+  toast('已解除绑定');
+}
+function hideSelBar(){rememberBindingDraft();disposeFormulaPreview();var bar=$('#selBar');bar.style.display='none';bar._info=null;bar._mapTbl=null;}
+function collectPlaceholders(name,shapeId){
+  var cp=currentPage();var sh=shapesOf(cp.source).find(function(x){return shapeId?x.shape_id===shapeId:x.shape_name===name;});
+  return sh?(sh.placeholder_paths||[]):[];
+}
+
+/* 字段路径解析（与后端一致） */
+function resolvePath(path){
+  function step(cur,key){
+    if(cur&&typeof cur==='object'){
+      if(Array.isArray(cur)){var i=parseInt(key,10);return i<cur.length?cur[i]:undefined;}
+      return Object.prototype.hasOwnProperty.call(cur,key)?cur[key]:undefined;
+    }
+    return undefined;
+  }
+  var cur=state.data;
+  var segs=path.split('.');
+  for(var i=0;i<segs.length;i++){
+    var raw=segs[i];var m=raw.match(/^([^\[]*)(\[(\d+)\])?$/);
+    if(m[1]){cur=step(cur,m[1]);if(cur===undefined)return undefined;}
+    if(m[3]){cur=step(cur,m[3]);if(cur===undefined)return undefined;}
+  }
+  return cur;
+}
+function fieldOptions(){
+  /* 数据列表：始终提供整个表单 Schema 的字段（含公司 LOGO 等图片槽位），
+     不依赖当前数据里是否已有值。 */
+  function opt(path){var m=metaOf(path);return '<option value="'+esc(path)+'">'+esc(m.pathLabel+'（'+path+'）')+'</option>';}
+  function optItem(col,tb){return '<option value="'+esc(col)+'">'+esc(tb.module+'.'+tb.group+'.'+tb.label+' · '+tb.columns[col]+'（'+col+'）')+'</option>';}
+  var out='';
+  var tb=repeatTableMeta();
+  if(tb)Object.keys(tb.columns).forEach(function(col){out+=optItem(col,tb);});
+  CAT.fields.forEach(function(x){out+=opt(x.path);});
+  Object.keys(CAT.tables).forEach(function(name){out+=opt('t.'+name);});
+  Object.keys(CAT.images).forEach(function(k){out+=opt(CAT.images[k].path);});
+  Object.keys(CAT.derived).forEach(function(k){out+=opt('derived.'+k);});
+  Object.keys(CAT.results).forEach(function(k){out+=opt('calc_results.'+k+'.verdict');});
+  return out;
+}
+function renderFieldHint(){
+  /* 表单字段目录：始终完整列出；点击任一字段 = 绑定到当前页面上已点选的对象。 */
+  function chipBtn(path){
+    var m=metaOf(path);
+    var val=resolvePath(path);
+    var cur=(val!==undefined&&val!==''&&typeof val==='string'&&!String(val).startsWith('data:')&&val.length<60)?(' 当前值:'+val):'';
+    return '<button class="chip-btn" data-path="'+esc(path)+'" title="'+esc(path+(cur?('｜'+cur):''))+'">'+esc(m.pathLabel)+'</button>';
+  }
+  function section(title,open,paths){
+    if(!paths.length)return '';
+    return '<details'+(open?' open':'')+' style="margin:2px 0"><summary style="cursor:pointer;font-size:11.5px;color:#c25200">'
+      +esc(title)+'（'+paths.length+'）<span class="hint">点击即绑定到已选中对象</span></summary>'
+      +'<div style="margin-top:3px">'+paths.map(chipBtn).join(' ')+'</div></details>';
+  }
+  var byModule={};
+  CAT.fields.forEach(function(x){(byModule[x.module]=byModule[x.module]||[]).push(x.path);});
+  var sections='';
+  Object.keys(byModule).forEach(function(mod){
+    sections+=section(mod+'（网页表单填写）',mod.indexOf('项目')===0||mod.indexOf('产品')===0,byModule[mod]);
+  });
+  var tb=repeatTableMeta();
+  if(tb){
+    var cols=Object.keys(tb.columns);
+    sections+=section('本页重复数组行字段（'+repeatTableName()+'，每条一行）',true,cols);
+  }
+  var tblChips=Object.keys(CAT.tables).map(function(name){
+    var x=CAT.tables[name];
+    return '<button class="chip-btn" data-tbl="'+esc(name)+'" title="t.'+esc(name)+'（'+esc(x.label)+'）">'
+      +'整表填入：'+esc(x.module+'.'+x.group+' · '+x.label)+'</button>';
+  }).join(' ');
+  sections+='<details style="margin:2px 0"><summary style="cursor:pointer;font-size:11.5px;color:#c25200">'
+    +'表格表单数据 t.*（履历/文件状态/材料/公差/问题…）<span class="hint">先点选页面上的表格对象，再点一项 → 整表填入</span>'
+    +'（'+Object.keys(CAT.tables).length+'）</summary><div style="margin-top:3px">'+tblChips+'</div></details>';
+  sections+=section('图片（上传到表单）',false,Object.keys(CAT.images).map(function(k){return CAT.images[k].path;}));
+  sections+=section('自动计算值',false,Object.keys(CAT.derived).map(function(k){return 'derived.'+k;}));
+  sections+=section('工艺计算结论',false,Object.keys(CAT.results).map(function(k){return 'calc_results.'+k+'.verdict';}));
+  $('#fieldHint').innerHTML=sections;
+}
+/* 点击字段目录 → 绑定到当前已点选对象（若未选对象则提示先点选） */
+$('#fieldHint').addEventListener('click',function(e){
+  var b=e.target.closest('.chip-btn');if(!b)return;
+  var bar=$('#selBar');
+  var info=bar._info;
+  var tbl=b.getAttribute('data-tbl');
+  if(tbl){
+    if(!info||bar.style.display==='none'){toast('请先在页面画布上点选“表格对象”，再点要整表填入的表格数据');return;}
+    applyTableRows(info,tbl);
+    return;
+  }
+  if(!info||bar.style.display==='none'){
+    toast('请先在页面画布上点击要绑定的对象（标题/文本框/图片/表格单元格），再点字段');
+    return;
+  }
+  bindNow(b.getAttribute('data-path'), info);
+});
+
+/* ---------------- 页号 / 重复 / 条件 变更 ---------------- */
+$('#selPageNo').addEventListener('change',function(){
+  state.previewSource=parseInt(this.value,10)||1;
+  renderPage();renderFieldHint();
+});
+$('#selData').addEventListener('change',async function(){
+  var canvas=$('#canvas');canvas._previewToken=(canvas._previewToken||0)+1;
+  if(canvas._previewAbort)canvas._previewAbort.abort();clearTimeout(canvas._previewTimer);
+  canvas.classList.remove('real-preview');canvas.style.backgroundImage='none';
+  $('#previewStatus').textContent='正在加载所选数据…';
+  try{
+    if(await loadData()===false)return;
+    renderPage();renderFieldHint();toast('已载入表单数据：'+this.value);
+  }catch(e){$('#previewStatus').textContent='数据加载失败：'+e.message;toast('数据加载失败，请重新选择数据来源');}
+});
+$('#inpRepeat').addEventListener('change',function(){var cp=editablePage();if(!cp)return;cp.repeat=this.value.trim();persistDeck();renderPageList();renderPage();renderFieldHint();});
+$('#inpCondition').addEventListener('change',function(){var cp=editablePage();if(!cp)return;cp.condition=this.value.trim();persistDeck();renderPageList();});
+$('#selZoom').addEventListener('change',renderPage);
+$('#chkLivePreview').addEventListener('change',renderPage);
+$('#selContinuation').addEventListener('change',function(){state.continuationPage=Number(this.value);renderPage();});
+
+/* ---------------- 生成 ---------------- */
+function serializeDeckPage(p){
+    var item={source:p.source};
+    if(p.template)item.template=p.template;
+    if(p.repeat)item.repeat=p.repeat;
+    if(p.condition)item.condition=p.condition;
+    if(p.images&&Object.keys(p.images).length)item.images=EditorModels.copy(p.images);
+    var bnd={};
+    Object.keys(p.bindings||{}).forEach(function(k){var b=p.bindings[k];
+      if(!b.source||!b.shape)return;
+      var spec={type:b.type,source:b.source,shape:b.shape};
+      if(b.options)spec.options=b.options;
+      if(b.required===false)spec.required=false;
+      bnd[k]=spec;});
+    if(Object.keys(bnd).length)item.bindings=bnd;
+    return item;
+}
+function buildDeckSlides(){
+  /* 预览、方案保存与生成共用序列化，跨模板页带 template。 */
+  return state.deck.map(serializeDeckPage);
+}
+async function generate(){
+  if(hasPendingBindingDrafts()){toast('还有未保存的对象修改，请先保存绑定再生成。');return;}
+  if(!state.template){toast('请先加载模板');return;}
+  if(!state.deck.length){toast('报告页面为空');return;}
+  var slides=buildDeckSlides();
+  var data={f:state.data.f||{},t:state.data.t||{},i:state.data.i||{}};
+  mask(true);
+  try{
+    var res=await api('/api/template/generate',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({template:state.baseTemplate||state.template,output_mode:'deck',missing:'keep',slides:slides,data:data})});
+    var blob=await res.blob();
+    var cd=res.headers.get('Content-Disposition')||'';var fn='DFM_TEMPLATE.pptx';
+    var m=cd.match(/filename\*=UTF-8''([^;]+)/);if(m)fn=decodeURIComponent(m[1]);
+    var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},3000);
+    $('#genStatus').innerHTML='<span class="ok">✔ 已生成：'+esc(fn)+'</span>'
+      +'（页 '+res.headers.get('x-dfm-slide-count')
+      +'，占位符替换 '+res.headers.get('x-dfm-text-replaced')
+      +'，显式绑定 '+res.headers.get('x-dfm-bindings-applied')
+      +'，图片 '+res.headers.get('x-dfm-images-bound')+'）';
+    var missingImages=Number(res.headers.get('x-dfm-images-missing'))||0;
+    if(missingImages)$('#genStatus').innerHTML+='<div style="color:#a65b00">注意：'+missingImages+' 处图片未填写，已保留模板原内容；补充图片后重新生成即可。</div>';
+    toast('生成成功');
+  }catch(e){$('#genStatus').innerHTML='<span class="bad">✘ '+esc(e.message)+'</span>';toast('生成失败：'+e.message);}
+  mask(false);
+}
+$('#btnGenerate').addEventListener('click',generate);
+
+/* ---------------- 模板方案：保存 / 载入二次编辑 / 删除 ---------------- */
+async function refreshSchemeList(selected){
+  try{
+    var res=await api('/api/schemes');var list=(await res.json()).schemes;
+    var sel=$('#selScheme');
+    sel.innerHTML=list.map(function(s){
+      var tip='模板 '+s.template+' ｜ 页 '+s.slide_count+' ｜ 绑定 '+s.binding_count+(s.description?' ｜ '+s.description:'');
+      return '<option value="'+esc(s.name)+'" data-tip="'+esc(tip)+'">'+esc(s.name+'（'+s.template+'，'+s.binding_count+' 处绑定）')+'</option>';
+    }).join('')||'<option value="">（暂无方案）</option>';
+    if(selected){sel.value=selected;}
+    updateSchemeHint();
+  }catch(e){toast('方案列表加载失败：'+e.message);}
+}
+function updateSchemeHint(){
+  var opt=$('#selScheme').selectedOptions&&$('#selScheme').selectedOptions[0];
+  var tip=opt&&opt.getAttribute('data-tip');
+  $('#schemeHint').textContent=tip?('已选：'+tip):'';
+}
+$('#btnSchemeSave').addEventListener('click',async function(){
+  if(hasPendingBindingDrafts()){toast('还有未保存的对象修改，请先保存绑定再保存方案。');return;}
+  var name=$('#inpSchemeName').value.trim();
+  if(!name){toast('请先填写方案名称');return;}
+  if(!state.template){toast('请先加载模板');return;}
+  if(!state.deck.length){toast('报告页面为空，请先添加页面');return;}
+  mask(true);
+  try{
+    var payload={name:name,template:state.baseTemplate||state.template,description:$('#inpSchemeDesc').value.trim(),
+      output_mode:'deck',missing:'keep',slides:buildDeckSlides()};
+    var res=await api('/api/schemes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    var out=await res.json();
+    toast('方案已保存：'+name+'（之后在 DFM 表单页填完数据即可一键生成）');
+    await refreshSchemeList(name);
+  }catch(e){toast('保存失败：'+e.message);}
+  mask(false);
+});
+$('#btnSchemeLoad').addEventListener('click',async function(){
+  var name=$('#selScheme').value;if(!name){toast('请先选择要载入的方案');return;}
+  mask(true);
+  try{
+    var res=await api('/api/schemes/'+encodeURIComponent(name));var record=await res.json();
+    $('#inpSchemeName').value=record.name;
+    $('#inpSchemeDesc').value=record.description||'';
+    $('#selTemplate').value=record.template;
+    state.baseTemplate=record.template;
+    // 载入模板并还原其页面/绑定，供二次编辑
+    var pages=(record.deck&&record.deck.slides)||[];
+    if(!pages.length){toast('该方案没有页面');return;}
+    await loadTemplate(pages);
+    var first=state.deck[0];
+    if(first.template&&first.template!==state.template)await switchTemplatePreview(first.template);
+    state.previewSource=first.source;renderPageList();renderPage();renderFieldHint();
+  }catch(e){toast('载入失败：'+e.message);}
+  mask(false);
+});
+$('#btnSchemeDelete').addEventListener('click',async function(){
+  var name=$('#selScheme').value;if(!name){toast('请先选择要删除的方案');return;}
+  if(!confirm('删除方案「'+name+'」？该操作不可恢复。'))return;
+  try{
+    await api('/api/schemes/'+encodeURIComponent(name),{method:'DELETE'});
+    toast('已删除方案：'+name);
+    if($('#inpSchemeName').value.trim()===name){$('#inpSchemeName').value='';}
+    refreshSchemeList();
+  }catch(e){toast('删除失败：'+e.message);}
+});
+$('#selScheme').addEventListener('change',updateSchemeHint);
+
+/* ---------------- 启动（恢复上次 deck） ---------------- */
+function restore(){
+  try{var saved=JSON.parse(localStorage.getItem(LS_KEY)||'null');
+    if(saved&&saved.template){state.template=saved.template;state.baseTemplate=saved.baseTemplate||saved.template;state.deck=saved.deck||[];state.current=0;}}catch(_){ }
+}
+window.addEventListener('DOMContentLoaded',function(){
+restore();
+refreshTemplates().then(function(){
+  var cp=currentPage();
+  if(cp&&cp.template)state.template=cp.template;
+  if(state.template){$('#selTemplate').value=state.template;}
+  loadTemplate();
+});
+refreshSchemeList();
+});
+</script>
+<script src="/static/editor_ux.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "template_version": "1",
+  "slide_type": "conclusion",
+  "template": "CONCLUSION",
+  "fields": {
+    "total": {"source": "total", "shape": "SUMMARY_TOTAL", "renderer": "text"},
+    "critical": {"source": "critical", "shape": "SUMMARY_CRITICAL", "renderer": "text"},
+    "major": {"source": "major", "shape": "SUMMARY_MAJOR", "renderer": "text"},
+    "minor": {"source": "minor", "shape": "SUMMARY_MINOR", "renderer": "text"}
+  }
+}

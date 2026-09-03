@@ -1,0 +1,29 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# ---- 运行数据 / 用户数据（不提交）----
+data/
+1-基础数据/
+
+# ---- 生成/输出产物 ----
+output/
+exact_style_previews/
+pilot_output_previews/
+template_previews/
+1_preview.png
+2_preview.png
+
+# ---- 大体积派生模板（由 tools/build_* 从官方模板生成，不入库）----
+templates/DFM_Master_exact_v1.pptx
+templates/DFM_Demo_ExactStyle_v1.pptx
+
+# ---- 日志 ----
+*.log
+
+# ---- 编辑器/系统 ----
+.DS_Store
+Thumbs.db

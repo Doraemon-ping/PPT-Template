@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "template_version": "1",
+  "slide_type": "part_specifications",
+  "template": "PART_SPECIFICATIONS",
+  "fields": {
+    "finished_weight": {"source": "finished_weight", "shape": "PART_FINISHED_WEIGHT", "renderer": "text", "required": false},
+    "casting_weight": {"source": "casting_weight", "shape": "PART_CASTING_WEIGHT", "renderer": "text", "required": false},
+    "runner_weight": {"source": "runner_weight", "shape": "PART_RUNNER_WEIGHT", "renderer": "text", "required": false},
+    "overflow_weight": {"source": "overflow_weight", "shape": "PART_OVERFLOW_WEIGHT", "renderer": "text", "required": false},
+    "wall_thickness": {"source": "wall_thickness", "shape": "PART_WALL", "renderer": "text", "required": false},
+    "maximum_wall_thickness": {"source": "maximum_wall_thickness", "shape": "PART_WALL_MAX", "renderer": "text", "required": false},
+    "length": {"source": "length", "shape": "PART_LENGTH", "renderer": "text", "required": false},
+    "width": {"source": "width", "shape": "PART_WIDTH", "renderer": "text", "required": false},
+    "height": {"source": "height", "shape": "PART_HEIGHT", "renderer": "text", "required": false},
+    "cavity_count": {"source": "cavity_count", "shape": "PART_CAVITY_COUNT", "renderer": "text", "required": false},
+    "casting_pressure": {"source": "casting_pressure", "shape": "PART_CASTING_PRESSURE", "renderer": "text", "required": false},
+    "material": {"source": "material", "shape": "PART_MATERIAL", "renderer": "text", "required": false},
+    "annual_volume": {"source": "annual_volume", "shape": "PART_ANNUAL_VOLUME", "renderer": "text", "required": false},
+    "project_type": {"source": "project_type", "shape": "PART_PROJECT_TYPE", "renderer": "text", "required": false},
+    "surface_requirement": {"source": "surface_requirement", "shape": "PART_SURFACE_REQUIREMENT", "renderer": "text", "required": false},
+    "leak_requirement": {"source": "leak_requirement", "shape": "PART_LEAK_REQUIREMENT", "renderer": "text", "required": false}
+  }
+}

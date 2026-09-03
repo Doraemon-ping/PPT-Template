@@ -1,0 +1,13 @@
+# 示例 Deck 编排：占位符演示模板（DFM_Template_Placeholder_Demo.pptx）
+# 占位符即绑定（pptx-template 约定）：模板文本中的 {f.partNo} 等路径由数据填充。
+# 每页可重复（repeat）或按条件（condition）跳过；images 按形状名绑定图片路径。
+template: demo
+output_mode: deck
+missing: keep
+slides:
+  - source: 1                                # 封面：{f.partNo} / {f.projName} / ...
+  - source: 2                                # 产品信息 + PART_IMAGE 图片绑定
+    images:
+      PART_IMAGE: "i.logoImg[0]"
+  - source: 3                                # 问题卡片：按 t.issues 重复
+    repeat: "t.issues"

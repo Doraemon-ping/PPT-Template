@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>高压压铸 DFM 报告自动生成工具 · FastAPI 版</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.0.5/400.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.0.5/500.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.0.5/700.css">
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+:root{
+  /* 浅色商务配色（部门橙 #FF6A00 主色） */
+  --bg:#f4f6f9;        /* 页面底色 */
+  --bg2:#ffffff;       /* 侧栏底色 */
+  --panel:#ffffff;     /* 卡片底色 */
+  --panel2:#f8fafc;    /* 卡片内嵌区 */
+  --line:#e3e8ef;      /* 分隔线 */
+  --line2:#d3dae4;     /* 输入边框 */
+  --txt:#1f2328;       /* 主文字 */
+  --muted:#6b7684;     /* 次文字 */
+  --accent:#ff6a00;    /* 部门橙 */
+  --accent2:#d95f00;   /* 浅底可读的深橙（用于文字） */
+  --ok:#128a3c; --warn:#b8730a; --bad:#c62828;
+  --rv:#c62828;        /* 计算结果红 */
+  --rvbg:rgba(198,40,40,.06);
+  --r:8px;
+  --sh:0 1px 3px rgba(16,24,40,.06),0 1px 2px rgba(16,24,40,.04);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-size:13px;line-height:1.6;
+  font-family:"Noto Sans SC","Microsoft YaHei","PingFang SC","Heiti SC","Hiragino Sans GB","Source Han Sans SC","WenQuanYi Micro Hei","Segoe UI",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased}
+input,select,textarea,button{font-family:inherit;font-size:13px;color:var(--txt)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#c8cfd9;border-radius:6px}
+::-webkit-scrollbar-track{background:transparent}
+a{color:var(--accent2)}
+
+/* ---------- 顶部固定条 ---------- */
+.topbar{position:fixed;top:0;left:0;right:0;height:54px;z-index:80;display:flex;align-items:center;gap:10px;
+  padding:0 14px;background:linear-gradient(90deg,#FF6A00 0%,#FF8A33 100%);color:#fff;
+  border-bottom:1px solid #e05500;box-shadow:0 2px 8px rgba(255,106,0,.26)}
+.topbar .logo{display:flex;align-items:baseline;gap:8px;white-space:nowrap;color:#fff}
+.topbar .logo b{font-size:16px;font-weight:700;letter-spacing:.5px}
+.topbar .logo span{font-size:11px;color:rgba(255,255,255,.9);font-weight:500}
+.topbar .logo .ver{font-size:11px;color:#fff;background:rgba(255,255,255,.2);padding:1px 8px;border-radius:11px;font-weight:600;letter-spacing:.3px}
+.spacer{flex:1}
+.tb-actions{display:flex;gap:6px;flex-wrap:wrap}
+.btn{border:1px solid var(--line2);background:#fff;color:#3d444d;border-radius:6px;
+  padding:6px 11px;cursor:pointer;font-size:12.5px;font-weight:500;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px;transition:.15s}
+.btn:hover{border-color:var(--accent);color:var(--accent);background:#fff5ee}
+.btn.gh{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.55);color:#fff}
+.btn.gh:hover{background:#fff;color:var(--accent);border-color:#fff}
+.btn.pri{background:linear-gradient(180deg,#ff7a12,#e85d00);border-color:#ff8a2e;color:#fff;font-weight:700}
+.btn.pri:hover{background:linear-gradient(180deg,#ff8c2e,#f26a00);color:#fff;border-color:#ffa04d}
+.btn.sm{padding:3px 8px;font-size:11.5px}
+.btn.dg:hover{border-color:var(--bad);color:var(--bad);background:#fdecec}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ---------- 布局 ---------- */
+#nav{position:fixed;top:54px;left:0;bottom:0;width:262px;overflow-y:auto;background:var(--bg2);
+  border-right:1px solid var(--line);z-index:70;padding:10px 0 60px;box-shadow:1px 0 3px rgba(16,24,40,.04)}
+#main{margin:64px 0 0 262px;padding:16px 22px 120px;max-width:1500px}
+@media(max-width:960px){
+  #nav{transform:translateX(-100%);transition:transform .2s}
+  #nav.show{transform:none}
+  #main{margin-left:0}
+  .hamburger{display:inline-flex !important}
+}
+.hamburger{display:none}
+
+/* ---------- 导航树 ---------- */
+.nav-mod{border-bottom:1px solid var(--line)}
+.nav-mod > .nh{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;user-select:none;
+  font-size:15px;font-weight:600;color:#3d444d}
+.nav-mod > .nh:hover{background:#fff5ee;color:var(--accent)}
+.nav-mod.open > .nh{background:#fff1e6;color:#c25200}
+.nav-mod.active > .nh{background:#ffe2cc;color:#bf4d00;font-weight:700;box-shadow:inset 3px 0 0 var(--accent)}
+.nav-mod > .nh .ar{margin-left:auto;font-size:11px;color:#9aa4b2;transition:.2s}
+.nav-mod.open > .nh .ar{transform:rotate(90deg)}
+.nav-sub{display:none;padding:3px 0 10px 22px}
+.nav-mod.open > .nav-sub{display:block}
+.nav-sub a{display:block;padding:8px 12px;font-size:13.5px;color:#6b7684;text-decoration:none;
+  border-left:2px solid transparent;border-radius:0 4px 4px 0}
+.nav-sub a:hover{color:var(--accent);background:#fff5ee;border-left-color:var(--accent)}
+.nav-sub a.active{color:var(--accent);font-weight:600;background:#fff1e6;border-left-color:var(--accent)}
+.nav-tip{padding:10px 14px;font-size:11px;color:#8a94a3}
+.nav-foot{padding:12px 14px;font-size:11px;color:#8a94a3;line-height:1.7}
+
+/* ---------- 模块 / 卡片 ---------- */
+.mod-hd{margin:22px 0 12px;padding-left:10px;border-left:4px solid var(--accent)}
+.mod-hd h2{margin:0;font-size:18px;font-weight:700;letter-spacing:.5px;color:#1f2328}
+.mod-hd p{margin:3px 0 0;font-size:12px;color:var(--muted)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);margin:0 0 14px;overflow:hidden;box-shadow:var(--sh)}
+.card > h3{margin:0;padding:9px 14px;font-size:13.5px;font-weight:600;color:#1f2328;
+  background:linear-gradient(90deg,#f7f9fb,#f1f4f8);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+.card > h3 .tag{font-size:10.5px;font-weight:500;color:#7b8595;background:#fff;border:1px solid var(--line2);
+  padding:1px 6px;border-radius:10px}
+.card > h3 .sp{flex:1}
+.card .body{padding:13px 14px}
+.scroll-anchor{scroll-margin-top:70px}
+
+/* ---------- 表单 ---------- */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(238px,1fr));gap:10px 14px}
+.grid.one{grid-template-columns:1fr}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field > label{font-size:11.5px;color:#5a6673;display:flex;align-items:center;gap:4px}
+.field > label .u{color:#8a94a3}
+.field .u{color:#8a94a3;font-size:11px}
+.inp{width:100%;background:#fff;border:1px solid var(--line2);border-radius:5px;padding:6px 8px;
+  color:var(--txt);outline:none;transition:.15s}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(255,106,0,.16)}
+select.inp{cursor:pointer}
+textarea.inp{min-height:64px;resize:vertical;line-height:1.6}
+input[type=file]{font-size:11.5px}
+.hint{font-size:11px;color:#8a94a3;line-height:1.5}
+.note{background:#f8fafc;border:1px dashed #cfd8e3;border-radius:6px;padding:8px 10px;
+  font-size:11.5px;color:#5a6673;line-height:1.65}
+.note b{color:var(--accent)}
+.formula{background:#f5f7fa;border:1px solid var(--line);border-left:3px solid var(--accent);
+  border-radius:0 6px 6px 0;padding:8px 11px;font-size:12px;color:#33475f;margin:2px 0 10px;
+  font-family:Consolas,"Courier New",monospace;overflow-x:auto;white-space:nowrap}
+
+/* ---------- 计算结果 ---------- */
+.result{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:10px 12px;margin-top:4px}
+.result h4{margin:0 0 8px;font-size:12.5px;color:#c25200;font-weight:600;display:flex;align-items:center;gap:8px}
+.result h4 .st{margin-left:auto}
+.rv{color:var(--rv);font-weight:700;font-size:14px;font-family:Consolas,monospace}
+.rv-s{color:var(--rv);font-weight:700;font-family:Consolas,monospace}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:7px 14px}
+.kv .k{font-size:11.5px;color:var(--muted)}
+.kv .v{font-size:13px}
+.verdict{margin-top:9px;padding:7px 10px;border-radius:5px;font-size:12px;line-height:1.65}
+.v-ok{background:#e8f7ee;border:1px solid #a8dfc0;color:#0f7a37}
+.v-warn{background:#fff6e3;border:1px solid #f0cf8a;color:#8a5a00}
+.v-bad{background:#fdecec;border:1px solid #f0b4b4;color:#a51f1f}
+.v-info{background:#eaf1fa;border:1px solid #b3cbe6;color:#1c4d80}
+.pill{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:700}
+.p-ok{background:#e8f7ee;color:#0f7a37}
+.p-warn{background:#fff6e3;color:#8a5a00}
+.p-bad{background:#fdecec;color:#a51f1f}
+.p-info{background:#eef1f5;color:#55637a}
+
+/* ---------- 表格编辑器 ---------- */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:#fff}
+table.ed{border-collapse:collapse;width:100%;font-size:12px;min-width:520px}
+table.ed th{background:#eef2f7;color:#33475f;font-weight:600;padding:6px 7px;text-align:left;
+  border:1px solid var(--line);white-space:nowrap;font-size:11.5px}
+table.ed td{border:1px solid var(--line);padding:2px 3px}
+table.ed td input.inp,table.ed td select.inp{border:0;background:transparent;padding:4px 5px;border-radius:0}
+table.ed td input.inp:focus,table.ed td select.inp:focus{box-shadow:none;background:#fff7f1}
+table.ed td.num{text-align:right;font-family:Consolas,monospace}
+.tbl-bar{display:flex;gap:6px;align-items:center;padding:8px 0 6px;flex-wrap:wrap}
+
+/* ---------- 只读数据表 ---------- */
+table.ro{border-collapse:collapse;width:100%;font-size:12px}
+table.ro th{background:#eef2f7;color:#33475f;padding:6px 8px;border:1px solid var(--line);
+  font-weight:600;text-align:left;font-size:11.5px;white-space:nowrap}
+table.ro td{padding:5px 8px;border:1px solid var(--line);text-align:left}
+table.ro td.n{text-align:right;font-family:Consolas,monospace}
+table.ro tr:nth-child(even) td{background:#fafbfc}
+table.ro td.hi{color:var(--rv);font-weight:700;font-family:Consolas,monospace}
+
+/* ---------- 图片 ---------- */
+.imgs{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.imgs .thumb{position:relative;width:132px;height:92px;border:1px solid var(--line2);border-radius:6px;
+  overflow:hidden;background:#f4f6f9;cursor:zoom-in}
+.imgs .thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.imgs .thumb .del{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:0;
+  border-radius:4px;width:20px;height:20px;cursor:pointer;font-size:12px;line-height:20px;padding:0}
+.imgs .thumb .del:hover{background:var(--bad)}
+.imgs .add{width:132px;height:92px;border:1px dashed #cfd8e3;border-radius:6px;display:grid;
+  place-items:center;color:#8a94a3;font-size:11.5px;cursor:pointer;background:#fafbfc;text-align:center;padding:6px}
+.imgs .add:hover{border-color:var(--accent);color:var(--accent);background:#fff5ee}
+
+/* ---------- Toast / 遮罩 ---------- */
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);z-index:200;
+  background:#fff;border:1px solid var(--accent);color:#1f2328;padding:9px 18px;border-radius:22px;
+  font-size:12.5px;opacity:0;pointer-events:none;transition:.25s;box-shadow:0 6px 20px rgba(16,24,40,.18)}
+#toast.on{opacity:1;transform:translateX(-50%)}
+#mask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:300;display:none;
+  place-items:center;backdrop-filter:blur(2px)}
+#mask.on{display:grid}
+#mask .box{background:#fff;border:1px solid var(--line);border-radius:10px;padding:22px 30px;
+  text-align:center;min-width:280px;box-shadow:0 10px 30px rgba(16,24,40,.2)}
+#schemeMask{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:320;display:none;
+  place-items:center;backdrop-filter:blur(2px)}
+#schemeMask.on{display:grid}
+#schemeMask .box{background:#fff;border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 10px 30px rgba(16,24,40,.2)}
+#schemeList .sch-row{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:5px 0;cursor:pointer;font-size:12.5px}
+#schemeList .sch-row:hover{border-color:var(--accent)}
+#schemeList .sch-row.sel{border-color:var(--accent);background:#fff4ec}
+#schemeList .sch-name{font-weight:700;color:#1f2328}
+#schemeList .sch-meta{font-size:11px;color:#6b7684;margin-top:2px}
+.spin{width:34px;height:34px;margin:0 auto 12px;border:3px solid #e3e8ef;border-top-color:var(--accent);
+  border-radius:50%;animation:sp .8s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+#lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:400;display:none;place-items:center;cursor:zoom-out}
+#lightbox.on{display:grid}
+#lightbox img{max-width:94vw;max-height:94vh;border-radius:6px}
+.sec-gap{height:6px}
+.mod .mod-hd .tag,.tag{display:inline-block;font-size:11.5px;color:#c2410c;background:#fff4ec;
+  border:1px solid #ffd2ad;border-radius:6px;padding:2px 8px;font-weight:600}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <button class="btn gh hamburger" id="btnNav" style="border-color:rgba(255,255,255,.55);color:#fff">☰</button>
+  <div class="logo"><b>HPDC · DFM 报告自动生成工具</b><span class="ver">FastAPI v1.0</span></div>
+  <div class="spacer"></div>
+  <div class="tb-actions">
+    <a class="btn" href="/template-editor" title="导入 .pptx 模板 → 绑定字段 → 保存方案">🧰 模板工作台</a>
+    <button class="btn" id="btnSchemeGen" title="用已保存的模板方案（模板+绑定关系）+ 当前表单数据直接生成">📋 按方案生成</button>
+    <button class="btn" id="btnSave">💾 保存项目</button>
+    <button class="btn" id="btnLoadProject">📂 载入项目</button>
+    <button class="btn" id="btnExport">⬇ 导出 JSON</button>
+    <button class="btn" id="btnImport">⬆ 导入 JSON</button>
+    <button class="btn" id="btnDemo">🧪 载入示例</button>
+    <button class="btn pri" id="btnPPT">⚡ 生成 PPT</button>
+  </div>
+  <input type="file" id="fileImport" accept=".json,application/json" style="display:none">
+</header>
+
+<aside id="nav"></aside>
+<main id="main"></main>
+
+<div id="toast"></div>
+<div id="mask"><div class="box"><div class="spin"></div><div id="maskTxt">正在生成 PPT…</div></div></div>
+<div id="lightbox"><img id="lbImg" alt=""></div>
+
+<!-- 按模板方案生成弹层 -->
+<div id="schemeMask"><div class="box" style="text-align:left;min-width:560px;max-width:760px;padding:16px 18px">
+  <div style="display:flex;align-items:center;gap:8px">
+    <b style="color:#c25200">📋 用模板方案生成（表单已填内容 + 方案里的模板/绑定）</b>
+    <span class="spacer" style="flex:1"></span>
+    <a href="/template-editor" style="font-size:11.5px">去工作台新建/编辑方案 →</a>
+  </div>
+  <div class="hint" style="margin:6px 0 4px">绑定一次后：在下方选择已保存方案，用当前表单数据直接生成替换内容的 PPT；方案可随时载入二次编辑。</div>
+  <div id="schemeList" style="max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:6px"></div>
+  <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+    <button class="btn pri" id="btnSchemeGenRun" disabled style="font-weight:700">⚡ 用所选方案生成</button>
+    <span class="hint" id="schemeGenStatus"></span>
+  </div>
+</div></div>
+
+<script>
+"use strict";
+/* =========================================================================
+ *  高压压铸 DFM 报告自动生成工具 —— FastAPI 版前端
+ *  结构：① 表单 Schema ② 渲染引擎 ③ API 层（计算 / PPT / 保存均走后端）
+ * ========================================================================= */
+
+/* ---------- 通用工具 ---------- */
+function $(s,r){return (r||document).querySelector(s);}
+function $$(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));}
+function num(v){var n=parseFloat(v);return isFinite(n)?n:0;}
+function fmt(v,d){d=(d===undefined)?2:d;var n=parseFloat(v);return isFinite(n)?n.toFixed(d):'-';}
+function esc(s){return String(s===undefined||s===null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function nl2br(s){return esc(s).replace(/\n/g,'<br>');}
+function toast(msg){var t=$('#toast');t.textContent=msg;t.classList.add('on');
+  clearTimeout(t._h);t._h=setTimeout(function(){t.classList.remove('on');},2600);}
+function mask(on,txt){if(txt)$('#maskTxt').textContent=txt;$('#mask').classList[on?'add':'remove']('on');}
+function lightbox(src){if(!src){$('#lightbox').classList.remove('on');return;}
+  $('#lbImg').src=src;$('#lightbox').classList.add('on');}
+$('#lightbox').addEventListener('click',function(){lightbox(null);});
+
+/* =========================================================================
+ *  ① 表单 Schema：严格对应模板章节顺序
+ *     字段类型：text / number / select / textarea / table / images / result / note / machine
+ * ========================================================================= */
+var MODULES = [
+
+/* ============ 项目信息 ============ */
+{id:'m1', name:'项目信息', desc:'封面 / DFM履历 / 文件状态', groups:[
+ {id:'g101', name:'封面信息', fields:[
+   {k:'projName', t:'项目名称', type:'text', def:''},
+   {k:'partNo', t:'零件号', type:'text', def:''},
+   {k:'partName', t:'零件名称', type:'text', def:''},
+   {k:'custName', t:'客户名称', type:'text', def:''},
+   {k:'version', t:'版本号', type:'text', def:'A0'},
+   {k:'dfmDate', t:'日期', type:'text', def:''},
+   {k:'projType', t:'项目类型', type:'select', def:'新项目', opt:['新项目','改款项目','设变优化','问题整改']},
+   {k:'maker', t:'编制', type:'text', def:''},
+   {k:'checker', t:'审核', type:'text', def:''},
+   {k:'approver', t:'批准', type:'text', def:''},
+   {k:'company', t:'公司标识（文字占位）', type:'text', def:'TUOPU · 压铸工艺部'},
+   {k:'logoImg', t:'公司 LOGO（占位图，可上传）', type:'images', max:1}
+ ]},
+ {id:'g102', name:'DFM 履历表（可增行）', fields:[
+   {k:'dfmHist', type:'table', add:true, cols:[
+     {k:'ver', t:'版本', type:'text', w:80},
+     {k:'date', t:'日期', type:'text', w:110},
+     {k:'author', t:'编制/修订', type:'text', w:110},
+     {k:'content', t:'主要修改内容', type:'text', w:360},
+     {k:'remark', t:'备注', type:'text', w:180}
+   ], rows:[
+     {ver:'A0',date:'',author:'',content:'首次发布 DFM 报告',remark:''}
+   ]}
+ ]},
+ {id:'g103', name:'文件状态录入（2D / 3D / ESOW …）', fields:[
+   {k:'fileStat', type:'table', add:true, cols:[
+     {k:'name', t:'文件名称', type:'text', w:190},
+     {k:'code', t:'文件编号', type:'text', w:150},
+     {k:'ver', t:'版本', type:'text', w:70},
+     {k:'state', t:'状态', type:'select', opt:['已提供','待提供','待确认','不适用','已更新'], w:100},
+     {k:'date', t:'接收日期', type:'text', w:110},
+     {k:'remark', t:'备注', type:'text', w:230}
+   ], rows:[
+     {name:'2D 图纸',code:'',ver:'',state:'待提供',date:'',remark:''},
+     {name:'3D 数据',code:'',ver:'',state:'待提供',date:'',remark:''},
+     {name:'ESOW / 技术规范',code:'',ver:'',state:'待提供',date:'',remark:''},
+     {name:'材料标准',code:'',ver:'',state:'待提供',date:'',remark:''},
+     {name:'外观/表面标准',code:'',ver:'',state:'待提供',date:'',remark:''},
+     {name:'装配/接口定义',code:'',ver:'',state:'待提供',date:'',remark:''}
+   ]}
+ ]}
+]},
+
+/* ============ 产品信息 ============ */
+{id:'m2', name:'产品信息', desc:'产品信息总表 / 胀型力与锁模力 / 最大铸造压力评估 / 机械性能', groups:[
+ {id:'g201', name:'产品信息总表', fields:[
+   {k:'productRunnerFrontImg', t:'产品+浇排正面图', type:'images', max:1},
+   {k:'productRunnerBackImg', t:'产品+浇排反面图', type:'images', max:1},
+   {k:'wFinish', t:'成品重量', type:'number', u:'kg', def:''},
+   {k:'wCast', t:'毛坯重量（铸件）', type:'number', u:'kg', def:''},
+   {k:'wRunner', t:'流道重量', type:'number', u:'kg', def:''},
+   {k:'wOverflow', t:'渣包重量', type:'number', u:'kg', def:''},
+   {k:'wPour', t:'每次浇注重量（自动）', type:'number', u:'kg', def:'', ro:true},
+   {k:'wall', t:'基本壁厚', type:'number', u:'mm', def:''},
+   {k:'wallMax', t:'最大壁厚', type:'number', u:'mm', def:''},
+   {k:'dimL', t:'产品尺寸 L', type:'number', u:'mm', def:''},
+   {k:'dimW', t:'产品尺寸 W', type:'number', u:'mm', def:''},
+   {k:'dimH', t:'产品尺寸 H', type:'number', u:'mm', def:''},
+   {k:'moldStructure', t:'模具结构', type:'text', def:'1出1'},
+   {k:'cav', t:'腔数', type:'number', u:'腔', def:'1'},
+   {k:'castP', t:'铸造压力', type:'number', u:'MPa', def:'80'},
+   {k:'material', t:'材料牌号', type:'select', def:'ADC12',
+     opt:['ADC12','A380','AlSi9Cu3(Fe)','YL113','A356','AlSi10MnMg','AlSi12(Fe)','C611','其他']},
+   {k:'matCustom', t:'其他材料（说明）', type:'text', def:''},
+   {k:'annual', t:'年产量', type:'number', u:'件/年', def:''},
+   {k:'surfaceReq', t:'表面要求', type:'select', def:'一般面', opt:['一般面','外观面','涂装面','密封面','机加工面']},
+   {k:'leakReq', t:'气密要求', type:'select', def:'无', opt:['无','气压测试','氦检','水压测试']},
+   {k:'leakVal', t:'气密指标', type:'text', def:''}
+ ]},
+ {id:'g202', name:'投影面积 · 胀型力 · 锁模力校核', fields:[
+   {type:'note', text:'胀型力 F = 铸造压力 P × 投影面积 A。单位换算：1 MPa × 1 cm² = 100 N = 0.1 kN。锁模力利用率建议 ≤ 85%，超过则需降比压或换更大吨位机型。'},
+   {k:'aPart', t:'产品投影面积', type:'number', u:'cm²', def:''},
+   {k:'aRunner', t:'流道投影面积', type:'number', u:'cm²', def:''},
+   {k:'aOver', t:'渣包投影面积', type:'number', u:'cm²', def:''},
+   {k:'aSlider', t:'滑块投影面积', type:'number', u:'cm²', def:''},
+   {k:'sliderForceAngle', t:'滑块胀型力夹角（留空则不折算）', type:'number', u:'°', def:''},
+   {k:'lockSafetyFactor', t:'锁模安全系数 K', type:'number', def:'1.1'},
+   {k:'useRatio', t:'锁模力利用率上限', type:'number', u:'%', def:'85'},
+   {k:'lockKN', t:'设备锁模力（自动带出）', type:'number', u:'kN', def:'', ro:true},
+   {type:'result', r:'rForce'}
+ ]},
+ {id:'g203', name:'最大铸造压力评估 · 哥林柱受力分布与平衡度', fields:[
+   {type:'formula', text:'Rᵢ = F/4 × (1 ± 2·ex/Bx ± 2·ey/By)　——　四根哥林柱反力（刚性模板假定）'},
+   {k:'aTotal2', t:'总投影面积（含滑块）', type:'number', u:'cm²', def:'', ro:true},
+   {k:'pMax2', t:'最大铸造比压', type:'number', u:'MPa', def:''},
+   {k:'tieX', t:'哥林柱中心距 X（Bx）', type:'number', u:'mm', def:''},
+   {k:'tieY', t:'哥林柱中心距 Y（By）', type:'number', u:'mm', def:''},
+   {k:'exOff', t:'投影形心偏移 X（ex）', type:'number', u:'mm', def:'0'},
+   {k:'eyOff', t:'投影形心偏移 Y（ey）', type:'number', u:'mm', def:'0'},
+   {k:'tieDia', t:'哥林柱直径', type:'number', u:'mm', def:'', ro:true},
+   {type:'result', r:'rTieBar'}
+ ]},
+ {id:'g204', name:'机械性能要求（各区域）', fields:[
+   {k:'mech', type:'table', add:true, cols:[
+     {k:'zone', t:'区域/位置', type:'text', w:180},
+     {k:'rm', t:'抗拉强度 Rm', type:'text', w:120},
+     {k:'rp', t:'屈服强度 Rp0.2', type:'text', w:140},
+     {k:'elong', t:'延伸率 A%', type:'text', w:110},
+     {k:'hb', t:'硬度 HB', type:'text', w:100},
+     {k:'remark', t:'备注（取样方式/频次）', type:'text', w:250}
+   ], rows:[
+     {zone:'本体（一般区域）',rm:'≥ 240 MPa',rp:'≥ 140 MPa',elong:'≥ 1.5 %',hb:'',remark:''},
+     {zone:'高强区域 / 受力区',rm:'',rp:'',elong:'≥ 2.0 %',hb:'',remark:''},
+     {zone:'延伸率要求区域',rm:'',rp:'',elong:'≥ 3.0 %',hb:'',remark:''},
+     {zone:'气密 / 加工区域',rm:'',rp:'',elong:'',hb:'',remark:''}
+   ]}
+ ]}
+]},
+
+/* ============ 工艺计算引擎 ============ */
+{id:'m3', name:'工艺计算引擎', desc:'包紧力 / 顶杆顶出力 / 挤压销 / 滑块缸径 / 抽真空 / 冷却水', groups:[
+ {id:'g301', name:'包紧力计算', fields:[
+   {type:'formula', text:'F = K · A · P · (η·cosα − sinα) / 10000　(吨)　K=1.1　P=10 MPa　η=0.25　A 单位 mm²'},
+   {k:'kHold', t:'系数 K', type:'number', def:'1.1'},
+   {k:'pHold', t:'包紧计算压强 P', type:'number', u:'MPa', def:'10'},
+   {k:'etaHold', t:'摩擦系数 η', type:'number', def:'0.25'},
+   {k:'aDyn', t:'动模侧包紧面积 A动', type:'number', u:'mm²', def:''},
+   {k:'aFix', t:'定模侧包紧面积 A定', type:'number', u:'mm²', def:''},
+   {k:'alpDyn', t:'动模侧拔模斜度 α动', type:'number', u:'°', def:'1.5'},
+   {k:'alpFix', t:'定模侧拔模斜度 α定', type:'number', u:'°', def:'1.5'},
+   {type:'result', r:'rHold'}
+ ]},
+ {id:'g302', name:'顶杆顶出力 · 规格选型', fields:[
+   {type:'formula', text:'单根许用顶出力 F单 = σ许 · π·d²/4 = 50 MPa × 78.54 mm² = 3927 N（φ10）　n = ⌈F需·安全系数 / F单⌉'},
+   {k:'ejSafe', t:'顶出安全系数', type:'number', def:'1.2'},
+   {k:'ejZone', t:'顶出分区数量', type:'number', u:'区', def:'4'},
+   {k:'ejDia', t:'选用顶杆直径', type:'select', def:'10', opt:['4','5','6','8','10','12']},
+   {k:'ejStress', t:'顶杆许用应力', type:'number', u:'MPa', def:'50'},
+   {k:'ejSpace', t:'可布置顶杆位上限', type:'number', u:'根', def:''},
+   {type:'result', r:'rEject'}
+ ]},
+ {id:'g303', name:'挤压销计算', fields:[
+   {type:'formula', text:'V = L · h · w · a (a=6%)　行程 d = V / 挤压销截面积　F挤 = P局 · A销　D缸 = √(4·F总/(π·16MPa))'},
+   {k:'sqL', t:'挤压区域长度 L', type:'number', u:'mm', def:''},
+   {k:'sqH', t:'挤压区域高度 h', type:'number', u:'mm', def:''},
+   {k:'sqW', t:'挤压区域宽度 w', type:'number', u:'mm', def:''},
+   {k:'sqA', t:'空隙率 a', type:'number', u:'%', def:'6'},
+   {k:'sqD', t:'挤压销直径 d', type:'number', u:'mm', def:''},
+   {k:'sqP', t:'局部挤压比压 P局', type:'number', u:'MPa', def:'80'},
+   {k:'sqLg', t:'导向长度 Lg', type:'number', u:'mm', def:'60'},
+   {k:'sqMu', t:'摩擦系数 μ', type:'number', def:'0.15'},
+   {k:'sqSysP', t:'系统压力', type:'number', u:'MPa', def:'16'},
+   {k:'sqShrink', t:'待补偿缩孔体积', type:'number', u:'mm³', def:''},
+   {type:'result', r:'rSqueeze'}
+ ]},
+ {id:'g304', name:'滑块油缸缸径计算', fields:[
+   {type:'formula', text:'抽芯阻力 = 包紧力公式　抽芯力 F抽 = K · 阻力 (K=1.3)　D缸 = √(4·(F抽+F摩)/(π·16MPa))'},
+   {k:'slA', t:'滑块成型包紧面积 A', type:'number', u:'mm²', def:''},
+   {k:'slAlpha', t:'抽芯拔模斜度 α', type:'number', u:'°', def:'1.5'},
+   {k:'slK', t:'抽芯系数 K', type:'number', def:'1.3'},
+   {k:'slMu', t:'导轨摩擦系数', type:'number', def:'0.15'},
+   {k:'slSysP', t:'系统压力', type:'number', u:'MPa', def:'16'},
+   {k:'slStroke', t:'抽芯行程', type:'number', u:'mm', def:''},
+   {k:'slNum', t:'滑块数量', type:'number', u:'个', def:'1'},
+   {type:'result', r:'rSlider'}
+ ]},
+ {id:'g305', name:'抽真空计算', fields:[
+   {type:'formula', text:'Qv = V · ln(P₀/P₁) / t　所需泵速 S = Qv × 3.6 × 1.3　阀口截面积 A = Qv×1000 / v'},
+   {k:'vcCav', t:'型腔容积', type:'number', u:'L', def:''},
+   {k:'vcRun', t:'流道+渣包容积', type:'number', u:'L', def:''},
+   {k:'vcSlvD', t:'压室直径', type:'number', u:'mm', def:''},
+   {k:'vcSlvL', t:'压室有效长度', type:'number', u:'mm', def:''},
+   {k:'vcTarget', t:'目标真空度 P₁', type:'number', u:'mbar', def:'50'},
+   {k:'vcTime', t:'允许抽气时间 t', type:'number', u:'s', def:'1.5'},
+   {k:'vcVel', t:'阀口气流速度 v', type:'number', u:'m/s', def:'80'},
+   {k:'vcPump', t:'真空泵抽速', type:'number', u:'m³/h', def:''},
+   {k:'vcLeak', t:'泄漏/安全系数', type:'number', def:'1.3'},
+   {type:'result', r:'rVacuum'}
+ ]},
+ {id:'g306', name:'冷却水量与冷却时间校核', fields:[
+   {type:'formula', text:'Q总 = C铝 · M · ΔT + M · 凝固潜热　需水量 W = Q总·φ / (C水·Δt水)　流量 = W / t冷 × 60'},
+   {k:'cwM', t:'每次浇注金属量 M', type:'number', u:'kg', def:'', ro:true},
+   {k:'cwC', t:'铝液比热 C铝', type:'number', u:'kJ/(kg·K)', def:'1.05'},
+   {k:'cwL', t:'凝固潜热', type:'number', u:'kJ/kg', def:'389'},
+   {k:'cwDT', t:'过热温差 ΔT（浇注温度−固相线）', type:'number', u:'K', def:'80'},
+   {k:'cwPhi', t:'水冷分配系数 φ', type:'number', def:'0.6'},
+   {k:'cwDTw', t:'冷却水温升 Δt水', type:'number', u:'K', def:'8'},
+   {k:'cwTime', t:'节拍允许冷却时间', type:'number', u:'s', def:''},
+   {k:'cwFlow', t:'实际设计水流量', type:'number', u:'L/min', def:''},
+   {type:'result', r:'rCool'}
+ ]}
+]},
+
+/* ============ 模具结构 ============ */
+{id:'m4', name:'模具结构', desc:'分型方案 / 镶拼 / 材料备料 / 总装尺寸 / 镶块深腔与冷却', groups:[
+ {id:'g401', name:'3D / 2D 分型方案', fields:[
+   {k:'plImg3d', t:'分型方案 3D 图', type:'images', max:4},
+   {k:'plImg2d', t:'分型方案 2D 图', type:'images', max:4},
+   {k:'plLine', t:'分型线描述', type:'textarea', def:''},
+   {k:'plBase', t:'分型面选择依据', type:'textarea', def:''}
+ ]},
+ {id:'g402', name:'镶拼总档与反拔模斜度', fields:[
+   {k:'insImg', t:'镶拼结构图', type:'images', max:4},
+   {k:'insPlan', t:'镶拼总档方案', type:'textarea', def:''},
+   {k:'antiDraft', t:'反拔模斜度处理', type:'textarea', def:''}
+ ]},
+ {id:'g403', name:'材料备料表', fields:[
+   {type:'note', text:'默认牌号：动定模芯 1.2343 / 关键镶块 DIEVAR / 模架 P20。硬度按常规 HRC 44~48（1.2343）、HRC 46~50（DIEVAR）、HRC 28~32（P20）。'},
+   {k:'matList', type:'table', add:true, cols:[
+     {k:'no', t:'序号', type:'text', w:56},
+     {k:'part', t:'部件', type:'text', w:180},
+     {k:'grade', t:'牌号', type:'select', opt:['1.2343','DIEVAR','1.2344','P20','45#','H13','8407','自定'], w:110},
+     {k:'hard', t:'硬度', type:'text', w:110},
+     {k:'supplier', t:'供应商', type:'text', w:140},
+     {k:'size', t:'尺寸', type:'text', w:170},
+     {k:'weight', t:'重量 kg', type:'number', w:90}
+   ], rows:[
+     {no:'1',part:'定模芯',grade:'1.2343',hard:'HRC 46~48',supplier:'',size:'',weight:''},
+     {no:'2',part:'动模芯',grade:'1.2343',hard:'HRC 46~48',supplier:'',size:'',weight:''},
+     {no:'3',part:'深腔镶块',grade:'DIEVAR',hard:'HRC 48~50',supplier:'',size:'',weight:''},
+     {no:'4',part:'滑块座/成型块',grade:'1.2343',hard:'HRC 44~46',supplier:'',size:'',weight:''},
+     {no:'5',part:'模架（A/B板）',grade:'P20',hard:'HRC 28~32',supplier:'',size:'',weight:''},
+     {no:'6',part:'浇口套/分流锥',grade:'DIEVAR',hard:'HRC 46~48',supplier:'',size:'',weight:''}
+   ]}
+ ]},
+ {id:'g404', name:'总装尺寸', fields:[
+   {k:'asm', type:'table', add:true, cols:[
+     {k:'item', t:'项目', type:'text', w:170},
+     {k:'l', t:'长 L', type:'number', w:100},
+     {k:'w', t:'宽 W', type:'number', w:100},
+     {k:'h', t:'高 H', type:'number', w:100},
+     {k:'wt', t:'重量 kg', type:'number', w:110},
+     {k:'remark', t:'备注', type:'text', w:230}
+   ], rows:[
+     {item:'定模芯',l:'',w:'',h:'',wt:'',remark:''},
+     {item:'动模芯',l:'',w:'',h:'',wt:'',remark:''},
+     {item:'定模框',l:'',w:'',h:'',wt:'',remark:''},
+     {item:'动模框',l:'',w:'',h:'',wt:'',remark:''},
+     {item:'滑块 1',l:'',w:'',h:'',wt:'',remark:''},
+     {item:'滑块 2',l:'',w:'',h:'',wt:'',remark:''},
+     {item:'模具总装（合模）',l:'',w:'',h:'',wt:'',remark:''}
+   ]}
+ ]},
+ {id:'g405', name:'镶块深腔设计 · 冷却与表面处理', fields:[
+   {k:'dcImg', t:'深腔镶块 / 冷却图', type:'images', max:4},
+   {k:'dcDesign', t:'深腔镶块设计说明', type:'textarea', def:''},
+   {k:'dcCool', t:'冷却方式', type:'select', def:'点冷 + 直冷组合',
+     opt:['直冷却水道','点冷（点式冷却）','真空阀冷却','镶块串联冷却','点冷 + 直冷组合','3D 打印随形冷却','高压水冷却']},
+   {k:'dcSurf', t:'表面处理', type:'select', def:'氮化',
+     opt:['氮化','软氮化','PVD 涂层','TD 处理','喷丸','无','其他']},
+   {k:'dcSurfNote', t:'表面处理补充说明', type:'text', def:''}
+ ]}
+]},
+
+/* ============ 浇排与工艺系统 ============ */
+{id:'m5', name:'浇排与工艺系统', desc:'流道理念 / 真空阀 / 压射参数 / 密封 / 挤压销布置 / PQ²', groups:[
+ {id:'g501', name:'流道理念', fields:[
+   {k:'grImg', t:'流道方案图', type:'images', max:4},
+   {k:'grText', t:'流道与排溢理念说明', type:'textarea', def:''}
+ ]},
+ {id:'g502', name:'真空阀选型', fields:[
+   {k:'vvType', t:'真空阀类型', type:'select', def:'机械阀', opt:['机械阀','排气块','主动阀','机械阀+排气块组合']},
+   {k:'vvModel', t:'型号/规格', type:'text', def:''},
+   {k:'vvArea', t:'单个阀排气截面积', type:'number', u:'mm²', def:''},
+   {k:'vvNum', t:'数量', type:'number', u:'个', def:'1'},
+   {k:'vvImg', t:'真空阀布置图', type:'images', max:3},
+   {k:'vvText', t:'真空方案说明', type:'textarea', def:''}
+ ]},
+ {id:'g503', name:'压射系统参数', fields:[
+   {type:'formula', text:'速率比 R = A冲 / A内　内浇口速度 v_g = Q / A内　快压射速度 v_p = Q / A冲　填充时间 t = V型腔 / Q'},
+   {k:'injD', t:'冲头直径', type:'number', u:'mm', def:''},
+   {k:'injAg', t:'内浇口面积 A内', type:'number', u:'mm²', def:''},
+   {k:'injVol', t:'型腔体积（含流道）', type:'number', u:'cm³', def:''},
+   {k:'injT', t:'填充时间 t', type:'number', u:'s', def:''},
+   {k:'injSlow', t:'慢压射速度', type:'number', u:'m/s', def:'0.25'},
+   {k:'injSwitch', t:'快慢压射切换位置', type:'number', u:'mm', def:''},
+   {k:'injIntP', t:'增压比压', type:'number', u:'MPa', def:''},
+   {type:'result', r:'rInject'}
+ ]},
+ {id:'g504', name:'密封方案（8 项）', fields:[
+   {k:'seal', type:'table', add:true, cols:[
+     {k:'no', t:'序号', type:'text', w:52},
+     {k:'item', t:'密封位置', type:'text', w:190},
+     {k:'type', t:'密封形式', type:'select', opt:['O 型圈','O 型圈+挡圈','紫铜垫','锥面密封','端面密封','螺纹密封胶','金属缠绕垫','组合密封'], w:150},
+     {k:'spec', t:'规格', type:'text', w:130},
+     {k:'remark', t:'说明', type:'text', w:300}
+   ], rows:[
+     {no:'1',item:'定模冷却水路',type:'O 型圈',spec:'',remark:''},
+     {no:'2',item:'动模冷却水路',type:'O 型圈',spec:'',remark:''},
+     {no:'3',item:'真空阀接口',type:'端面密封',spec:'',remark:''},
+     {no:'4',item:'滑块水路/油路',type:'O 型圈+挡圈',spec:'',remark:''},
+     {no:'5',item:'镶块冷却水路',type:'O 型圈',spec:'',remark:''},
+     {no:'6',item:'顶杆/推板导柱',type:'组合密封',spec:'',remark:''},
+     {no:'7',item:'分流锥/浇口套',type:'锥面密封',spec:'',remark:''},
+     {no:'8',item:'型芯冷却（点冷）',type:'O 型圈+挡圈',spec:'',remark:''}
+   ]}
+ ]},
+ {id:'g505', name:'挤压销布置与配合间隙', fields:[
+   {k:'sqImg', t:'挤压销布置图', type:'images', max:3},
+   {k:'sqLayout', t:'挤压销布置说明', type:'textarea', def:''},
+   {k:'sqGap', t:'挤压销配合间隙', type:'text', def:'H7/g6，双边 0.02~0.04 mm'},
+   {k:'sqCool', t:'挤压销冷却方式', type:'text', def:'点冷/油冷'}
+ ]},
+ {id:'g506', name:'PQ² 工艺窗口', fields:[
+   {type:'note', text:'机器特性线：P = P_max × (1 − (Q/Q_max)²)，P_max = 压射力 / 冲头面积，Q_max = 空压射速度 × 冲头面积。工艺点 (Q, P) 需落在机器线下方并保留 15% 余量。'},
+   {type:'result', r:'rPQ2'}
+ ]}
+]}
+];
+
+/* ============ 压铸机参数库 ============ */
+MODULES.push({id:'m6', name:'压铸机参数库', desc:'力劲 / 布勒机型，选中自动填充', groups:[
+ {id:'g601', name:'机型选择（自动填充全部参数）', fields:[
+   {k:'machineId', type:'machine'},
+   {type:'result', r:'rMachine'}
+ ]},
+ {id:'g602', name:'机型对照表', fields:[ {type:'result', r:'rMachList'} ]}
+]});
+
+/* ============ 模流分析 10 项 ============ */
+var FLOW_ITEMS = [
+ {k:'f01', t:'1 速度', tip:'含壁厚 - 内浇口速度经验对照表', extra:'speedTable'},
+ {k:'f02', t:'2 卷气', tip:'卷气位置与卷入量评估'},
+ {k:'f03', t:'3 气压', tip:'型腔残余气压与排气能力'},
+ {k:'f04', t:'4 填充温度', tip:'高/中/低温分区'},
+ {k:'f05', t:'5 料液追踪', tip:'金属流前沿汇合位置'},
+ {k:'f06', t:'6 固相分数', tip:'凝固顺序与固相分布'},
+ {k:'f07', t:'7 氧化物', tip:'氧化夹杂聚集区域'},
+ {k:'f08', t:'8 缩孔', tip:'ASTM 等级与点冷优化', extra:'astm'},
+ {k:'f09', t:'9 填充率', tip:'填充完整性与短射风险'},
+ {k:'f10', t:'10 热平衡与变形', tip:'模具热平衡与铸件变形'}
+];
+var flowGroups = FLOW_ITEMS.map(function(it){
+  var flds = [{k:it.k+'Img', t:'分析图片（可多张）', type:'images', max:4}];
+  if(it.extra==='speedTable'){
+    flds.push({type:'note', text:'壁厚 - 内浇口速度经验对照表（下表自动进入 PPT）'});
+    flds.push({type:'result', r:'rGateSpeed'});
+  }
+  if(it.extra==='astm'){
+    flds.push({type:'note', text:'缩孔等级按 ASTM E505 评定，Level 1 最优、Level 8 最差；通常要求 ≤ Level 4（关键区域 ≤ Level 2）。'});
+    flds.push({k:it.k+'Astm', t:'缩孔等级（ASTM E505）', type:'select', def:'ASTM E505 Level 4', opt:['ASTM E505 Level 1','ASTM E505 Level 2','ASTM E505 Level 3','ASTM E505 Level 4','ASTM E505 Level 5','ASTM E505 Level 6','ASTM E505 Level 7','ASTM E505 Level 8']});
+    flds.push({k:it.k+'Area', t:'缩孔位置', type:'text', def:''});
+    flds.push({k:it.k+'Cool', t:'点冷优化方案', type:'text', def:''});
+  }
+  flds.push({k:it.k+'Conc', t:'结论', type:'textarea', def:''});
+  flds.push({k:it.k+'Opt',  t:'优化方案', type:'textarea', def:''});
+  return {id:'g'+it.k, name: it.t.replace(/^\d+\s*/,''), desc:it.tip, fields:flds};
+});
+MODULES.push({id:'m7', name:'模流分析（10 项）', desc:'速度/卷气/气压/填充温度/料液追踪/固相分数/氧化物/缩孔/填充率/热平衡与变形',
+  groups:flowGroups});
+
+/* ============ 质量策划 ============ */
+MODULES.push({id:'m8', name:'质量策划', desc:'SPR 点位分析（2 页）/ 追溯策划 / 图纸公差可行性', groups:[
+ {id:'g801', name:'SPR 点位分析（第 1 页）', fields:[
+   {k:'spr1Img', t:'SPR 点位图（第 1 页）', type:'images', max:4},
+   {k:'spr1Text', t:'SPR 分析说明（第 1 页）', type:'textarea', def:''},
+   {k:'spr1Table', type:'table', add:true, cols:[
+     {k:'no', t:'点位', type:'text', w:80},
+     {k:'pos', t:'位置描述', type:'text', w:230},
+     {k:'thick', t:'局部壁厚 mm', type:'number', w:110},
+     {k:'risk', t:'风险评估', type:'select', opt:['低','中','高'], w:100},
+     {k:'act', t:'措施', type:'text', w:280}
+   ], rows:[{no:'SPR-01',pos:'',thick:'',risk:'中',act:''}]}
+ ]},
+ {id:'g802', name:'SPR 点位分析（第 2 页）', fields:[
+   {k:'spr2Img', t:'SPR 点位图（第 2 页）', type:'images', max:4},
+   {k:'spr2Text', t:'SPR 分析说明（第 2 页）', type:'textarea', def:''}
+ ]},
+ {id:'g803', name:'追溯策划', fields:[
+   {k:'trImg', t:'追溯标识图', type:'images', max:3},
+   {k:'trPos', t:'激光打码位置', type:'text', def:''},
+   {k:'trQr', t:'二维码样式', type:'select', def:'DataMatrix',
+     opt:['DataMatrix','QR Code','DM + 明码','激光刻字','钢印']},
+   {k:'trSize', t:'码尺寸', type:'text', def:'6 × 6 mm'},
+   {k:'trContent', t:'编码规则', type:'text', def:'零件号 + 日期 + 班次 + 模号 + 流水号'},
+   {k:'trText', t:'追溯策划说明', type:'textarea', def:''}
+ ]},
+ {id:'g804', name:'图纸公差可行性评估与修改建议', fields:[
+   {k:'tol', type:'table', add:true, cols:[
+     {k:'no', t:'序号', type:'text', w:52},
+     {k:'item', t:'公差项', type:'text', w:170},
+     {k:'req', t:'图纸要求', type:'text', w:150},
+     {k:'cap', t:'工艺能力', type:'text', w:150},
+     {k:'feas', t:'可行性', type:'select', opt:['可行','有风险','不可行','需协商'], w:100},
+     {k:'prop', t:'修改建议', type:'text', w:300}
+   ], rows:[
+     {no:'1',item:'线性尺寸公差',req:'',cap:'GB/T 6414 CT6~CT7',feas:'可行',prop:''},
+     {no:'2',item:'形位公差（平面度）',req:'',cap:'',feas:'有风险',prop:''},
+     {no:'3',item:'位置度',req:'',cap:'',feas:'可行',prop:''},
+     {no:'4',item:'加工余量',req:'',cap:'',feas:'可行',prop:''}
+   ]}
+ ]}
+]});
+
+/* ============ 问题清单 ============ */
+MODULES.push({id:'m9', name:'问题清单', desc:'问题描述 / 修改方案 / 客户回复', groups:[
+ {id:'g901', name:'开口问题清单（可增行）', fields:[
+   {k:'issues', type:'table', add:true, cols:[
+     {k:'no', t:'序号', type:'text', w:52},
+     {k:'desc', t:'问题描述', type:'text', w:330},
+     {k:'prop', t:'修改方案 / 建议', type:'text', w:330},
+     {k:'fb', t:'客户回复', type:'text', w:250},
+     {k:'st', t:'状态', type:'select', opt:['开放','已关闭','待客户确认','风险评估中'], w:120}
+   ], rows:[{no:'1',desc:'',prop:'',fb:'',st:'开放'}]}
+ ]}
+]});
+
+/* ============ 技术应用与结尾 ============ */
+MODULES.push({id:'m10', name:'技术应用与结尾', desc:'模具温度 / 压铸岛 / 公司介绍 / 致谢 / 保密声明', groups:[
+ {id:'g1001', name:'模具温度与热管理', fields:[
+   {k:'tFix', t:'定模目标温度', type:'number', u:'℃', def:'200'},
+   {k:'tDyn', t:'动模目标温度', type:'number', u:'℃', def:'220'},
+   {k:'tCore', t:'型芯/镶块温度', type:'number', u:'℃', def:'250'},
+   {k:'tPre', t:'模具预热温度', type:'number', u:'℃', def:'180'},
+   {k:'tCtrl', t:'温控方式', type:'select', def:'模温机（水基）',
+     opt:['模温机（水基）','模温机（油基）','高压冷水机','点冷独立控制','模温机+点冷组合']},
+   {k:'tText', t:'模具温度控制策略说明', type:'textarea', def:''}
+ ]},
+ {id:'g1002', name:'压铸岛：温控 / 喷涂 / 真空设计', fields:[
+   {k:'isImg', t:'压铸岛布置图', type:'images', max:3},
+   {k:'isTemp', t:'压铸岛温控设计', type:'textarea', def:''},
+   {k:'isSpray', t:'喷涂方案', type:'select', def:'机器人喷涂 + 定点吹干',
+     opt:['机器人喷涂 + 定点吹干','机器人喷涂（微量）','手工喷涂','免喷涂工艺','喷涂 + 模内喷涂监控']},
+   {k:'isSprayText', t:'喷涂补充说明', type:'textarea', def:''},
+   {k:'isVac', t:'真空系统设计', type:'textarea', def:''}
+ ]},
+ {id:'g1003', name:'公司介绍 / 致谢 / 保密声明', fields:[
+   {k:'coIntro', t:'公司介绍', type:'textarea', def:''},
+   {k:'thanks', t:'致谢', type:'textarea', def:'感谢客户团队在本次 DFM 交流中的支持与配合。'},
+   {k:'secret', t:'保密声明', type:'textarea',
+     def:'本报告及其附件包含专有技术信息，仅限本次项目交流使用，未经书面许可不得向第三方披露、复制或用于其他目的。'}
+ ]}
+]});
+
+/* =========================================================================
+ *  ② 状态与渲染引擎
+ * ========================================================================= */
+/* 压铸机型号列表（仅用于下拉选择；完整参数库在 FastAPI 后端） */
+var MACHINES = [
+  {brand:'力劲 LK',model:'DCC7200',ton:7200},{brand:'力劲 LK',model:'DCC4500',ton:4500},
+  {brand:'力劲 LK',model:'DCC3000',ton:3000},{brand:'力劲 LK',model:'DCC2800',ton:2800},
+  {brand:'力劲 LK',model:'DCC2000',ton:2000},{brand:'力劲 LK',model:'DCC840',ton:840},
+  {brand:'布勒 Bühler',model:'Evolution 4400',ton:4400},{brand:'布勒 Bühler',model:'Evolution 4000',ton:4000},
+  {brand:'布勒 Bühler',model:'Evolution 2800',ton:2800},{brand:'布勒 Bühler',model:'Evolution 1400',ton:1400},
+  {brand:'布勒 Bühler',model:'Evolution 840',ton:840}
+];
+var S = {f:{}, t:{}, i:{}};
+var LS_KEY = 'hpdc_dfm_project_a12';
+
+/* 用 Schema 默认值初始化状态 */
+function initState(){
+  S = {f:{}, t:{}, i:{}};
+  MODULES.forEach(function(m){
+    m.groups.forEach(function(g){
+      g.fields.forEach(function(f){
+        if(f.type==='table'){ S.t[f.k] = JSON.parse(JSON.stringify(f.rows||[])); }
+        else if(f.type==='images'){ S.i[f.k] = []; }
+        else if(f.k){ S.f[f.k] = (f.def===undefined?'':f.def); }
+      });
+    });
+  });
+}
+function V(k){ var v = S.f[k]; return (v===undefined||v===null)?'':v; }
+function N(k){ return num(V(k)); }
+
+/* ---------- 渲染：导航树 ---------- */
+function renderNav(){
+  var h = '';
+  MODULES.forEach(function(m,i){
+    h += '<div class="nav-mod'+(i===0?' open active':'')+'" data-mod="'+m.id+'">'
+      +  '<div class="nh"><span>'+esc(m.name)+'</span><span class="ar">▶</span></div>'
+      +  '<div class="nav-sub">';
+    m.groups.forEach(function(g){
+      h += '<a href="#'+g.id+'" data-g="'+g.id+'">'+esc(g.name)+'</a>';
+    });
+    h += '</div></div>';
+  });
+  h += '<div class="nav-foot">计算 / PPT 由 FastAPI 后端完成<br>数据自动保存于本机浏览器<br>（localStorage），可保存至服务器</div>';
+  $('#nav').innerHTML = h;
+
+  $$('#nav .nh').forEach(function(el){
+    el.addEventListener('click',function(){
+      switchView(el.parentNode.getAttribute('data-mod'));
+      if(window.innerWidth<=960) $('#nav').classList.remove('show');
+    });
+  });
+  $$('#nav .nav-sub a').forEach(function(a){
+    a.addEventListener('click',function(e){
+      e.preventDefault();
+      var g = a.getAttribute('data-g');
+      var mod = a.closest('.nav-mod');
+      switchView(mod.getAttribute('data-mod'));
+      $$('#nav .nav-sub a').forEach(function(x){ x.classList.remove('active'); });
+      a.classList.add('active');
+      var t = document.getElementById(g);
+      if(t){ t.scrollIntoView({behavior:'smooth',block:'start'}); highlight(t); }
+      if(window.innerWidth<=960) $('#nav').classList.remove('show');
+    });
+  });
+}
+function highlight(el){
+  $$('.card').forEach(function(c){c.style.boxShadow='';});
+  var card = el.classList.contains('card')?el:el.querySelector('.card');
+  if(card){ card.style.boxShadow='0 0 0 2px var(--accent)';
+    setTimeout(function(){card.style.boxShadow='';},1600); }
+}
+
+/* ---------- 渲染：主表单 ---------- */
+function renderMain(viewId){
+  if(!viewId) viewId = currentView || (MODULES[0] && MODULES[0].id);
+  currentView = viewId;
+  var m=null, idx=-1;
+  for(var i=0;i<MODULES.length;i++){ if(MODULES[i].id===viewId){ m=MODULES[i]; idx=i; break; } }
+  var h='';
+  if(m){
+    h += '<section class="mod" id="'+m.id+'">';
+    h += '<div class="mod-hd scroll-anchor"><h2>'+esc(m.name)+'</h2><p>'+esc(m.desc||'')+'</p></div>';
+    m.groups.forEach(function(g){
+      h += '<div class="card scroll-anchor" id="'+g.id+'">';
+      h += '<h3><span>'+esc(g.name)+'</span>'+(g.desc?'<span class="tag">'+esc(g.desc)+'</span>':'')+'<span class="sp"></span></h3>';
+      h += '<div class="body">';
+      var grid=[], full=[];
+      g.fields.forEach(function(f){
+        if(f.type==='table'||f.type==='result'||f.type==='note'||f.type==='formula'||f.type==='machine') full.push(f);
+        else grid.push(f);
+      });
+      if(grid.length){
+        h += '<div class="grid">';
+        grid.forEach(function(f){ h += renderField(f); });
+        h += '</div>';
+      }
+      full.forEach(function(f){ h += renderField(f); });
+      h += '</div></div>';
+    });
+    h += '</section>';
+  }
+  $('#main').innerHTML = h;
+  refreshAll(false);
+  try{ $('#main').scrollTop = 0; }catch(e){}
+}
+var currentView = null;
+/* 切换到指定父模块的独立界面，并同步左侧导航高亮 */
+function switchView(id){
+  currentView = id;
+  renderMain(id);
+  $$('#nav .nav-mod').forEach(function(n){
+    var on = n.getAttribute('data-mod')===id;
+    n.classList.toggle('active', on);
+    n.classList.toggle('open', on);
+  });
+}
+
+function renderField(f){
+  var v = V(f.k);
+  if(f.type==='note') return '<div class="note">'+f.text+'</div>';
+  if(f.type==='formula') return '<div class="formula">'+esc(f.text)+'</div>';
+  if(f.type==='result') return '<div class="result" data-r="'+f.r+'"></div>';
+  if(f.type==='machine'){
+    var opts = MACHINES.map(function(m){
+      return '<option value="'+esc(m.brand+' '+m.model)+'"'+(V('machineId')===m.brand+' '+m.model?' selected':'')+'>'
+        + esc(m.brand+' '+m.model+' · '+m.ton+'T')+'</option>';
+    }).join('');
+    return '<div class="field" style="grid-column:1/-1"><label>选择压铸机（选中后自动填充全部参数）</label>'
+      + '<select class="inp" data-k="machineId">'+opts+'</select>'
+      + '<div class="hint">设备库为参考数据，请按现场实际设备维护。</div></div>';
+  }
+  if(f.type==='table'){
+    var body = (S.t[f.k]||[]).map(function(row,ri){ return renderRow(f,row,ri); }).join('');
+    var head = f.cols.map(function(c){ return '<th'+(c.w?' style="min-width:'+c.w+'px"':'')+'>'+esc(c.t)+'</th>'; }).join('');
+    return '<div data-tbl="'+f.k+'">'
+      + '<div class="tbl-bar">'
+      + (f.add?'<button class="btn sm" data-add="'+f.k+'">＋ 增行</button>':'')
+      + '<span class="hint">共 <b id="cnt_'+f.k+'">'+(S.t[f.k]||[]).length+'</b> 行</span></div>'
+      + '<div class="tbl-wrap"><table class="ed"><thead><tr>'+head+'<th style="width:42px">操作</th></tr></thead>'
+      + '<tbody>'+body+'</tbody></table></div></div>';
+  }
+  if(f.type==='images'){
+    return '<div class="field" style="grid-column:1/-1"><label>'+esc(f.t)+(f.max?'（最多 '+f.max+' 张）':'')+'</label>'
+      + '<div class="imgs" data-img="'+f.k+'">'+renderThumbs(f.k)+'</div></div>';
+  }
+  if(f.type==='textarea'){
+    return '<div class="field" style="grid-column:1/-1"><label>'+esc(f.t)+'</label>'
+      + '<textarea class="inp" data-k="'+f.k+'" placeholder="'+(f.ph||'')+'">'+esc(v)+'</textarea></div>';
+  }
+  if(f.type==='select'){
+    var o=(f.opt||[]).map(function(x){return '<option'+((String(x)===String(v))?' selected':'')+'>'+esc(x)+'</option>';}).join('');
+    return '<div class="field"><label>'+esc(f.t)+'</label><select class="inp" data-k="'+f.k+'">'+o+'</select></div>';
+  }
+  var ro = f.ro?' readonly style="background:#f7f9fb;color:#c62828;font-weight:600"':'';
+  return '<div class="field"><label>'+esc(f.t)+(f.u?' <span class="u">('+f.u+')</span>':'')+'</label>'
+    + '<input class="inp" type="'+(f.type==='number'?'text':'text')+'" inputmode="decimal" data-k="'+f.k+'" value="'+esc(v)+'"'+ro+'></div>';
+}
+function renderRow(f,row,ri){
+  var tds = f.cols.map(function(c){
+    var val = row[c.k];
+    var inner;
+    if(c.type==='select'){
+      inner = '<select class="inp" data-t="'+f.k+'" data-r="'+ri+'" data-c="'+c.k+'">'
+        + (c.opt||[]).map(function(x){return '<option'+((String(x)===String(val))?' selected':'')+'>'+esc(x)+'</option>';}).join('')
+        + '</select>';
+    }else{
+      inner = '<input class="inp" data-t="'+f.k+'" data-r="'+ri+'" data-c="'+c.k+'" value="'+esc(val)+'"'
+        + (c.type==='number'?' inputmode="decimal" style="text-align:right"':'') + '>';
+    }
+    return '<td>'+inner+'</td>';
+  }).join('');
+  return '<tr>'+tds+'<td style="text-align:center"><button class="btn sm dg" data-del="'+f.k+'" data-ri="'+ri+'">✕</button></td></tr>';
+}
+function renderThumbs(k){
+  var arr = S.i[k]||[];
+  var h = arr.map(function(src,i){
+    return '<div class="thumb"><img src="'+src+'" alt=""><button class="del" data-delimg="'+k+'" data-idx="'+i+'">✕</button></div>';
+  }).join('');
+  h += '<label class="add">＋ 上传图片<input type="file" accept="image/*" multiple data-up="'+k+'" style="display:none"></label>';
+  return h;
+}
+
+/* ---------- 事件绑定（事件委托） ---------- */
+function bindMain(){
+  var main = $('#main');
+  main.addEventListener('input', function(e){
+    var el=e.target;
+    if(el.hasAttribute && el.hasAttribute('data-k')){
+      S.f[el.getAttribute('data-k')] = el.value;
+      onChanged(el.getAttribute('data-k'));
+    }else if(el.hasAttribute && el.hasAttribute('data-c')){
+      var t=el.getAttribute('data-t'), r=+el.getAttribute('data-r'), c=el.getAttribute('data-c');
+      if(S.t[t] && S.t[t][r]) S.t[t][r][c]=el.value;
+      save(); refreshAll(false);
+    }
+  });
+  main.addEventListener('change', function(e){
+    var el=e.target;
+    if(el.hasAttribute && el.hasAttribute('data-k')){
+      S.f[el.getAttribute('data-k')] = el.value; onChanged(el.getAttribute('data-k'));
+    }else if(el.hasAttribute && el.hasAttribute('data-c')){
+      var t=el.getAttribute('data-t'), r=+el.getAttribute('data-r'), c=el.getAttribute('data-c');
+      if(S.t[t] && S.t[t][r]) S.t[t][r][c]=el.value;
+      save(); refreshAll(false);
+    }else if(el.hasAttribute && el.hasAttribute('data-up')){
+      handleUpload(el);
+    }
+  });
+  main.addEventListener('click', function(e){
+    var el=e.target.closest?e.target.closest('[data-add],[data-del],[data-delimg],.thumb img'):null;
+    if(!el) return;
+    if(el.hasAttribute('data-add')){
+      var k=el.getAttribute('data-add');
+      var fld=findTableField(k); var row={};
+      (fld.cols||[]).forEach(function(c){ row[c.k]= (c.type==='select'&&c.opt)?c.opt[0]:''; });
+      S.t[k].push(row); rerenderTable(k); save(); refreshAll(false);
+    }else if(el.hasAttribute('data-del')){
+      var kk=el.getAttribute('data-del'), ri=+el.getAttribute('data-ri');
+      S.t[kk].splice(ri,1); rerenderTable(kk); save(); refreshAll(false);
+    }else if(el.hasAttribute('data-delimg')){
+      var key=el.getAttribute('data-delimg'), idx=+el.getAttribute('data-idx');
+      S.i[key].splice(idx,1); refreshThumbs(key); save(); refreshAll(false);
+    }else if(el.tagName==='IMG' && el.parentNode.classList.contains('thumb')){
+      lightbox(el.src);
+    }
+  });
+}
+function findTableField(k){
+  var found=null;
+  MODULES.forEach(function(m){ m.groups.forEach(function(g){ g.fields.forEach(function(f){ if(f.k===k) found=f; }); }); });
+  return found;
+}
+function rerenderTable(k){
+  var wrap = $('[data-tbl="'+k+'"]'); if(!wrap) return;
+  var f = findTableField(k);
+  wrap.querySelector('tbody').innerHTML = (S.t[k]||[]).map(function(row,ri){return renderRow(f,row,ri);}).join('');
+  var cnt = $('#cnt_'+k); if(cnt) cnt.textContent=(S.t[k]||[]).length;
+}
+function refreshThumbs(k){
+  var box = $('[data-img="'+k+'"]'); if(!box) return;
+  box.innerHTML = renderThumbs(k);
+}
+/* 输入变化：联动 + 重算（计算走后端） */
+function onChanged(k){
+  if(k==='machineId'){ refreshAll(true); }
+  else { refreshAll(false); }
+  save();
+}
+
+/* ---------- 图片上传（压缩后存 base64，随项目提交后端） ---------- */
+var IMG_MAXW = 1280, IMG_Q = 0.72;
+function handleUpload(input){
+  var k = input.getAttribute('data-up');
+  var files = Array.prototype.slice.call(input.files||[]);
+  if(!files.length) return;
+  var fld = findImagesField(k);
+  var max = (fld&&fld.max)||6;
+  files.forEach(function(file){
+    compressImage(file, function(dataUrl){
+      if(S.i[k].length>=max){ toast('最多 '+max+' 张，已忽略多余图片'); return; }
+      S.i[k].push(dataUrl); refreshThumbs(k); save();
+    });
+  });
+  input.value='';
+}
+function findImagesField(k){
+  var found=null;
+  MODULES.forEach(function(m){ m.groups.forEach(function(g){ g.fields.forEach(function(f){ if(f.k===k) found=f; }); }); });
+  return found;
+}
+function compressImage(file, cb){
+  var fr = new FileReader();
+  fr.onload = function(e){
+    var im = new Image();
+    im.onload = function(){
+      var w=im.width, h=im.height;
+      if(w>IMG_MAXW){ h = Math.round(h*IMG_MAXW/w); w = IMG_MAXW; }
+      var c=document.createElement('canvas'); c.width=w; c.height=h;
+      var ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);
+      ctx.drawImage(im,0,0,w,h);
+      cb(c.toDataURL('image/jpeg', IMG_Q));
+    };
+    im.onerror=function(){ cb(e.target.result); };
+    im.src = e.target.result;
+  };
+  fr.readAsDataURL(file);
+}
+
+/* =========================================================================
+ *  ③ API 层（FastAPI 后端：计算 / PPT / 项目保存 / 示例）
+ * ========================================================================= */
+function postJSON(url, body){
+  return fetch(url, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+}
+async function errMsg(res){
+  var msg = '请求失败 ('+res.status+')';
+  try{ var e = await res.json(); if(e && e.detail) msg = e.detail; }catch(_){}
+  return msg;
+}
+function applyValues(map){
+  Object.keys(map||{}).forEach(function(k){
+    S.f[k] = map[k];
+    var el = $('[data-k="'+k+'"]');
+    if(el && el.tagName==='INPUT') el.value = map[k];
+  });
+}
+function applyResults(results){
+  Object.keys(results||{}).forEach(function(k){
+    var el = $('.result[data-r="'+k+'"]');
+    if(el) el.innerHTML = results[k].html;
+  });
+}
+var refreshTimer = null;
+function refreshAll(applyMachine){
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(async function(){
+    try{
+      var res = await postJSON('/api/calc', {f:S.f, t:S.t, apply_machine: !!applyMachine});
+      if(!res.ok){ throw new Error(await errMsg(res)); }
+      var data = await res.json();
+      if(applyMachine && data.machine_fill) applyValues(data.machine_fill);
+      applyValues(data.derived);
+      applyResults(data.results);
+    }catch(e){ console.error('计算失败', e); }
+  }, 200);
+}
+async function genPPT(){
+  mask(true,'正在生成 PPT…');
+  try{
+    var res = await postJSON('/api/ppt', {f:S.f, t:S.t, i:S.i});
+    if(!res.ok){ throw new Error(await errMsg(res)); }
+    var blob = await res.blob();
+    var cd = res.headers.get('Content-Disposition')||'';
+    var fn = 'DFM.pptx';
+    var m1 = cd.match(/filename\*=UTF-8''([^;]+)/);
+    if(m1){ fn = decodeURIComponent(m1[1]); }
+    else{ var m2 = cd.match(/filename="?([^";]+)"?/); if(m2) fn = m2[1]; }
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = fn; a.click();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+    mask(false); toast('PPT 已生成：'+fn);
+  }catch(e){ mask(false); toast('导出失败：'+e.message); }
+}
+async function loadDemo(){
+  try{
+    var res = await fetch('/api/demo');
+    if(!res.ok){ throw new Error(await errMsg(res)); }
+    var data = await res.json();
+    mergeState(data);
+    renderMain(); refreshAll(true); save();
+    toast('已载入示例数据');
+  }catch(e){ toast('载入示例失败：'+e.message); }
+}
+async function saveProject(){
+  try{
+    var res = await postJSON('/api/project/save', {f:S.f, t:S.t, i:S.i});
+    if(!res.ok){ throw new Error(await errMsg(res)); }
+    var data = await res.json();
+    toast(data.ok ? '已保存到服务器' : '保存失败');
+  }catch(e){ toast('保存失败：'+e.message); }
+}
+async function loadProject(){
+  try{
+    var res = await fetch('/api/project/load');
+    if(!res.ok){ throw new Error(await errMsg(res)); }
+    var data = await res.json();
+    var has = data && (Object.keys(data.f||{}).length || Object.keys(data.t||{}).length || Object.keys(data.i||{}).length);
+    if(!has){ toast('服务器暂无已保存的项目'); return; }
+    if(!confirm('载入服务器项目将覆盖当前内容，是否继续？')) return;
+    mergeState(data);
+    renderMain(); refreshAll(true); save();
+    toast('已载入服务器项目');
+  }catch(e){ toast('载入失败：'+e.message); }
+}
+
+/* =========================================================================
+ *  保存 / 导入 / 导出
+ * ========================================================================= */
+var saveTimer = null;
+function save(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function(){
+    try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }
+    catch(e){
+      try{
+        var light = {f:S.f, t:S.t, i:{}};
+        localStorage.setItem(LS_KEY, JSON.stringify(light));
+        toast('存储超上限，已保存表单数据（图片未保存）');
+      }catch(e2){ toast('本地存储失败：'+e2.message); }
+    }
+  }, 400);
+}
+function mergeState(o){
+  initState();
+  if(!o) return;
+  if(o.f) Object.keys(o.f).forEach(function(k){ S.f[k]=o.f[k]; });
+  if(o.t) Object.keys(o.t).forEach(function(k){ S.t[k]=o.t[k]; });
+  if(o.i) Object.keys(o.i).forEach(function(k){ S.i[k]=o.i[k]; });
+}
+function exportJSON(){
+  var blob = new Blob([JSON.stringify(S,null,2)], {type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'DFM_'+(V('partNo')||'Project')+'_'+(V('version')||'A0')+'.json';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 3000);
+  toast('已导出 JSON');
+}
+function importJSON(file){
+  var fr = new FileReader();
+  fr.onload = function(e){
+    try{
+      mergeState(JSON.parse(e.target.result));
+      renderMain(); refreshAll(true); save();
+      toast('导入成功');
+    }catch(err){ toast('导入失败：'+err.message); }
+  };
+  fr.readAsText(file);
+}
+
+/* =========================================================================
+ *  启动
+ * ========================================================================= */
+function boot(){
+  var saved = null;
+  try{ saved = JSON.parse(localStorage.getItem(LS_KEY)||'null'); }catch(e){ saved = null; }
+  mergeState(saved);
+  if(!S.f.machineId) S.f.machineId = '力劲 LK DCC3000';
+  renderNav();
+  renderMain();
+  refreshAll(true);
+}
+
+bindMain();
+
+$('#btnSave').addEventListener('click', saveProject);
+$('#btnLoadProject').addEventListener('click', loadProject);
+$('#btnExport').addEventListener('click', exportJSON);
+$('#btnImport').addEventListener('click', function(){ $('#fileImport').click(); });
+$('#fileImport').addEventListener('change', function(e){
+  if(e.target.files && e.target.files[0]) importJSON(e.target.files[0]);
+  e.target.value='';
+});
+$('#btnDemo').addEventListener('click', function(){
+  if(confirm('载入示例数据将覆盖当前内容，是否继续？')) loadDemo();
+});
+$('#btnPPT').addEventListener('click', genPPT);
+$('#btnNav').addEventListener('click', function(){ $('#nav').classList.toggle('show'); });
+
+/* =========================================================================
+ *  按模板方案生成（方案 = 模板 pptx + 绑定关系，绑定一次反复使用）
+ * ========================================================================= */
+var schemeSelectedName = null;
+function schemeMask(on){ $('#schemeMask').classList[on?'add':'remove']('on'); }
+function loadSchemeList(){
+  return fetch('/api/schemes').then(function(r){ return r.json(); })
+    .then(function(data){
+      var list = data.schemes || [];
+      var box = $('#schemeList');
+      if(!list.length){
+        box.innerHTML = '<div class="hint" style="padding:10px">还没有保存的方案。<br>请到「🧰 模板工作台」绑定字段后保存方案（一次绑定，之后这里直接生成）。</div>';
+        $('#btnSchemeGenRun').disabled = true;
+        return;
+      }
+      box.innerHTML = '';
+      list.forEach(function(s){
+        var row = document.createElement('div');
+        row.className = 'sch-row'+(s.name===schemeSelectedName?' sel':'');
+        row.innerHTML = '<div class="sch-name">'+esc(s.name)+'</div>'
+          + '<div class="sch-meta">模板：'+esc(s.template)+' ｜ 页面 '+s.slide_count+' ｜ 绑定 '+s.binding_count
+          + (s.description?(' ｜ '+esc(s.description)):'')+'</div>';
+        row.addEventListener('click', function(){
+          schemeSelectedName = s.name;
+          $$('#schemeList .sch-row').forEach(function(x){ x.classList.remove('sel'); });
+          row.classList.add('sel');
+          $('#btnSchemeGenRun').disabled = false;
+        });
+        box.appendChild(row);
+      });
+    });
+}
+$('#btnSchemeGen').addEventListener('click', function(){
+  schemeMask(true);
+  schemeSelectedName = null;
+  loadSchemeList();
+});
+$('#schemeMask').addEventListener('click', function(e){
+  if(e.target === this){ schemeMask(false); }
+});
+$('#btnSchemeGenRun').addEventListener('click', function(){
+  if(!schemeSelectedName){ toast('请先选择一个方案'); return; }
+  mask(true, '正在按方案生成 PPT…');
+  fetch('/api/schemes/'+encodeURIComponent(schemeSelectedName)+'/generate', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ data:{ f:S.f, t:S.t, i:S.i } })
+  }).then(function(res){
+    if(!res.ok){ return res.json().then(function(e){ throw new Error(e.detail||('生成失败('+res.status+')')); }); }
+    return res.blob().then(function(blob){
+      var cd = res.headers.get('Content-Disposition')||'';
+      var fn = 'DFM_SCHEME.pptx';
+      var m = cd.match(/filename\*=UTF-8''([^;]+)/); if(m){ fn = decodeURIComponent(m[1]); }
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url; a.download = fn; a.click();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 3000);
+      var st = $('#schemeGenStatus');
+      st.innerHTML = '<span class="ok">✔ 已生成 '+esc(fn)+'（页 '+res.headers.get('x-dfm-slide-count')
+        +'，文本替换 '+res.headers.get('x-dfm-text-replaced')
+        +'，绑定 '+res.headers.get('x-dfm-bindings-applied')
+        +'，图片 '+res.headers.get('x-dfm-images-bound')+'）</span>';
+      var missingImages = Number(res.headers.get('x-dfm-images-missing')) || 0;
+      if (missingImages) st.innerHTML += '<div style="color:#a65b00">注意：'+missingImages+' 处图片未填写，已保留模板原内容；补充图片后重新生成即可。</div>';
+      toast('已生成：'+fn);
+    });
+  }).catch(function(e){
+    $('#schemeGenStatus').innerHTML = '<span class="bad">✘ '+esc(e.message)+'</span>';
+    toast('生成失败：'+e.message);
+  }).finally(function(){ mask(false); });
+});
+
+/* 页面关闭前兜底保存 */
+window.addEventListener('beforeunload', function(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(S)); }catch(e){}
+});
+
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "template_version": "1",
+  "slide_type": "issue_compare",
+  "template": "ISSUE_COMPARE",
+  "fields": {
+    "id": {"source": "id", "shape": "ISSUE_ID", "renderer": "text"},
+    "title": {"source": "title", "shape": "ISSUE_TITLE", "renderer": "text", "options": {"max_length": 100}},
+    "severity": {"source": "severity.value", "shape": "ISSUE_LEVEL", "renderer": "badge"},
+    "description": {"source": "description", "shape": "ISSUE_DESCRIPTION", "renderer": "text", "options": {"max_length": 350}},
+    "recommendation": {"source": "recommendation", "shape": "ISSUE_RECOMMENDATION", "renderer": "text", "options": {"max_length": 350}},
+    "before": {"source": "images.before", "shape": "IMAGE_BEFORE", "renderer": "complex_image", "options": {"mode": "contain"}},
+    "after": {"source": "images.after", "shape": "IMAGE_AFTER", "renderer": "complex_image", "options": {"mode": "contain"}}
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "template_version": "1",
+  "slide_type": "cover",
+  "template": "COVER",
+  "fields": {
+    "title": {"source": "part_number", "shape": "DFM_TITLE", "renderer": "text"},
+    "project_name": {"source": "project_name", "shape": "PROJECT_NAME", "renderer": "text"},
+    "part_name": {"source": "part_name", "shape": "PART_NAME", "renderer": "text"},
+    "part_number": {"source": "part_number", "shape": "PART_NUMBER", "renderer": "text"},
+    "report_date": {"source": "report_date", "shape": "REPORT_DATE", "renderer": "text"}
+  }
+}

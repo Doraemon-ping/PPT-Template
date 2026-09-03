@@ -1,0 +1,6 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-pptx>=0.6.23
+python-multipart>=0.0.9
+PyYAML>=6.0
+lxml>=5.0
