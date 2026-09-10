@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DFM 模板可视化绑定 · 点选页面对象关联表单字段</title>
+<title>DFM 模板可视化绑定 · 通用 PPT 模板工作台</title>
 <style>
 :root{--accent:#ff6a00;--accent2:#d95f00;--line:#e3e8ef;--line2:#d3dae4;--txt:#1f2328;--muted:#6b7684;--bg:#f4f6f9;--panel:#fff;--ok:#128a3c;--bad:#c62828;--r:8px}
 *{box-sizing:border-box}
@@ -96,6 +96,9 @@ button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-vis
 .formula-block .block-actions{display:flex;gap:6px;align-items:center}.block-actions strong{flex:1}
 .formula-tools{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.formula-tools button{min-width:34px}
 #formulaPreviewImage{display:block;width:100%;max-height:160px;object-fit:contain;background:white;border:1px solid var(--line);border-radius:6px}
+.template-targets{margin-top:8px;border:1px solid #ffd2ad;background:#fffaf5;border-radius:6px;padding:7px 9px}
+.template-targets h4{margin:0 0 4px;color:#a84d00;font-size:12px}.target-row{display:flex;gap:6px;align-items:flex-start;padding:4px 0;border-top:1px solid #f4dfcf}.target-row:first-of-type{border-top:0}.target-row .target-path{font-family:Consolas,monospace;color:#8b4b14}.target-row .target-state{margin-left:auto;color:#687584;white-space:nowrap}.target-row.pending .target-state{color:#c62828}
+.target-tag{display:inline-block;margin:2px 3px 2px 0;padding:1px 6px;border-radius:9px;background:#fff1e4;border:1px solid #ffd0aa;color:#99500f;font:11px Consolas,monospace}
 dialog{width:min(900px,calc(100vw - 32px));max-height:calc(100vh - 60px);border:1px solid var(--line2);border-radius:12px;padding:20px;color:var(--txt);overflow:auto}
 dialog::backdrop{background:rgba(15,23,42,.5)}
 .dialog-title{display:flex;gap:12px;align-items:center}.dialog-title h2{font-size:18px;margin:0;flex:1}
@@ -110,7 +113,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.page-item .page-tools{display:fle
 </head>
 <body>
 <header>
-  <b>DFM 模板可视化绑定</b>
+  <b>PPT 模板可视化绑定</b>
   <span style="font-size:11px;opacity:.9">导入 PPT → 点击页面上的标题/表格/图片对象 → 关联表单字段 → 生成替换后的 PPT</span>
   <span class="spacer"></span>
   <a class="back" href="/">← 返回 DFM 表单</a>
@@ -134,11 +137,12 @@ button:disabled{opacity:.5;cursor:not-allowed}.page-item .page-tools{display:fle
       </select>
       <button class="pri" id="btnLoadTpl" style="margin-top:6px;width:100%">加载模板</button>
       <div class="hint" id="tplHint" style="margin-top:6px"></div>
+      <div class="hint" id="draftSyncStatus" role="status">工作台草稿准备中</div>
     </div>
 
     <div class="card">
       <h3>② 模板方案（绑定一次，之后填表直接生成）</h3>
-      <label>方案名称（保存后可在 DFM 表单页一键生成）</label>
+      <label>方案名称（保存后可在对应表单项目中生成报告）</label>
       <input type="text" id="inpSchemeName" placeholder="如：A12 后纵梁支架报告方案">
       <label>说明（可选）</label>
       <input type="text" id="inpSchemeDesc" placeholder="用途备注">
@@ -197,13 +201,14 @@ button:disabled{opacity:.5;cursor:not-allowed}.page-item .page-tools{display:fle
         <button id="btnSelectObject">编辑绑定</button>
       </div>
       <div class="hint" id="objectSummary">对象列表可以选中重叠对象、公式和表格单元格。</div>
+      <div id="templateTargets" class="template-targets" hidden></div>
       <div id="selBar" style="display:none"></div>
     </div>
 
     <div class="card">
-      <h3>表单字段目录（先在页面上点选对象，再点下方字段 → 立即绑定）</h3>
-      <div class="hint">完整列出网页表单可填写的全部字段（含公司 LOGO 等图片槽位，始终可选）。
-        点任一字段即可绑定到已选中的对象；也可在弹层里手填路径。</div>
+      <h3>表单字段目录（绑定到 PPT 模板目标）</h3>
+      <div class="hint">PPT 模板决定“目标对象”和占位符名称；这里仅列出当前 HTML 表单的真实字段。
+        先选择上方模板目标，再点字段建立显式绑定，不依赖任何固定的客户/零件字段命名。</div>
       <div id="fieldHint"></div>
     </div>
   </div>
@@ -228,12 +233,15 @@ button:disabled{opacity:.5;cursor:not-allowed}.page-item .page-tools{display:fle
 <script>
 "use strict";
 /* =========================================================================
- *  可视化点选绑定工作台
+ *  通用 PPT 模板可视化点选绑定工作台
  *  state.deck[i] = {source, repeat, condition, bindings: {key: spec}}
  *  spec = {type:'text'|'image'|'table_cell', source, shape, options?:{row,column}}
  * ========================================================================= */
 var state = {template:null, baseTemplate:null, data:null, inspect:null, scan:null, deck:[], current:0, previewSource:1, previewVersion:0};
 var LS_KEY = 'dfm_workbench_deck_v1';
+var FORM_PARAMS=new URLSearchParams(location.search),FORM_APP=FORM_PARAMS.get('app_id')||'dfm',FORM_PROJECT=FORM_PARAMS.get('project_id');
+LS_KEY+=':'+FORM_APP+':'+(FORM_PROJECT||'templates');
+function scopedUrl(path){var url=new URL(path,location.origin);url.searchParams.set('app_id',FORM_APP);return url.pathname+url.search;}
 var CANVAS_W = 1000; // 设计宽度(px)，EMU->px 由缩放换算
 var CAT = window.DFM_CATALOG || {fields:[],tables:{},images:{},derived:{},results:{}};
 
@@ -241,11 +249,11 @@ var CAT = window.DFM_CATALOG || {fields:[],tables:{},images:{},derived:{},result
 function fieldMeta(path){
   if(path.indexOf('f.')===0){
     var f=CAT.fields.find(function(x){return x.path===path;});
-    if(f)return {label:f.label, pathLabel:f.module+'.'+f.group+'.'+f.label};
+    if(f)return {label:f.label, pathLabel:f.module+'.'+f.group+'.'+f.label, sourcePath:f.source_path||''};
   }else if(path.indexOf('i.')===0){
     var mm=path.match(/^i\.(\w+)(\[0\])?$/);
     if(mm&&CAT.images[mm[1]]){var im=CAT.images[mm[1]];
-      return {label:im.label, pathLabel:im.module+'.'+im.group+'.'+im.label};}
+      return {label:im.label, pathLabel:im.module+'.'+im.group+'.'+im.label, sourcePath:im.source_path||''};}
   }else if(path.indexOf('derived.')===0){
     var d=path.slice(8);
     if(CAT.derived[d])return {label:CAT.derived[d], pathLabel:'自动派生.'+CAT.derived[d]};
@@ -255,8 +263,8 @@ function fieldMeta(path){
   }else if(path.indexOf('t.')===0){
     var tm=path.match(/^t\.(\w+)(?:\[\d+\])?(?:\.([^.]+))?$/);
     if(tm&&CAT.tables[tm[1]]){var tb=CAT.tables[tm[1]];
-      if(tm[2]&&tb.columns[tm[2]])return {label:tb.columns[tm[2]], pathLabel:tb.module+'.'+tb.group+'.'+tb.label+' · '+tb.columns[tm[2]]};
-      return {label:tb.label, pathLabel:tb.module+'.'+tb.group+'.'+tb.label};}
+      if(tm[2]&&tb.columns[tm[2]])return {label:tb.columns[tm[2]], pathLabel:tb.module+'.'+tb.group+'.'+tb.label+' · '+tb.columns[tm[2]], sourcePath:tb.source_path||''};
+      return {label:tb.label, pathLabel:tb.module+'.'+tb.group+'.'+tb.label, sourcePath:tb.source_path||''};}
   }
   return null;
 }
@@ -290,7 +298,7 @@ function $$(s){return Array.prototype.slice.call(document.querySelectorAll(s));}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function toast(m){var t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(function(){t.style.display='none';},2800);}
 function mask(on){$('#mask').classList[on?'add':'remove']('on');}
-async function api(path,opts){var r=await fetch(path,opts);if(!r.ok){var m='请求失败 ('+r.status+')';try{var e=await r.json();if(e.detail)m=e.detail;}catch(_){ }throw new Error(m);}return r;}
+async function api(path,opts){opts=Object.assign({cache:'no-store'},opts||{});var r=await fetch(scopedUrl(path),opts);if(!r.ok){var m='请求失败 ('+r.status+')';try{var e=await r.json();if(e.detail)m=e.detail;}catch(_){ }throw new Error(m);}return r;}
 
 /* ---------------- 模板 / 数据加载 ---------------- */
 async function refreshTemplates(){
@@ -328,9 +336,15 @@ async function loadData(){
   var which=$('#selData').value;
   var version=(state.dataRequest||0)+1;state.dataRequest=version;
   var loaded;
-  if(which==='demo')loaded=await (await api('/api/demo')).json();
+  if(which.indexOf('saved:')===0)loaded=(await(await api('/api/form-apps/'+FORM_APP+'/projects/'+which.slice(6))).json()).data;
+  else if(which==='defaults')loaded=await(await api('/api/form-apps/'+FORM_APP+'/defaults')).json();
+  else if(which==='demo')loaded=await (await api('/api/demo')).json();
   else if(which==='project')loaded=await (await api('/api/project/load')).json();
   else loaded={f:{},t:{},i:{}};
+  if(FORM_APP!=='dfm'){
+    var freshCatalog=await(await api('/api/form-apps/'+FORM_APP+'/catalog'+(which.indexOf('saved:')===0?'?project_id='+encodeURIComponent(which.slice(6)):''))).json();
+    if(state.dataRequest!==version)return false;CAT=freshCatalog;state.data=loaded;renderFieldHint();return true;
+  }
   var calc=await api('/api/calc',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({f:loaded.f||{},t:loaded.t||{},apply_machine:false})}).then(function(r){return r.json();});
   if(state.dataRequest!==version)return false;
@@ -343,6 +357,7 @@ async function loadData(){
 
 async function loadTemplate(deckPages){
   var id=$('#selTemplate').value;mask(true);
+  if(!id){$('#tplHint').textContent='此表单还没有 PPT 模板，请先导入 .pptx 文件。';mask(false);return;}
   try{
     if(!state.data){await loadData();}
     var scan=await api('/api/template/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({template:id})}).then(function(r){return r.json();});
@@ -403,7 +418,17 @@ $('#fileUpload').addEventListener('change',async function(e){
 });
 
 /* ---------------- 页面列表（deck） ---------------- */
-function persistDeck(){try{localStorage.setItem(LS_KEY,JSON.stringify({template:state.template,baseTemplate:state.baseTemplate,deck:state.deck}));}catch(_){ } }
+var draftRevision=0,draftReady=false,draftSaving=false,draftPending=false,draftTimer;
+function persistDeck(){try{localStorage.setItem(LS_KEY,JSON.stringify({template:state.template,baseTemplate:state.baseTemplate,deck:state.deck}));}catch(_){ }
+  if(!draftReady)return;draftPending=true;clearTimeout(draftTimer);draftTimer=setTimeout(syncDeckDraft,600);
+}
+async function syncDeckDraft(){
+  if(draftSaving||!draftPending)return;draftPending=false;draftSaving=true;$('#draftSyncStatus').textContent='正在保存工作台草稿…';
+  try{var res=await api('/api/form-apps/'+FORM_APP+'/drafts/'+(FORM_PROJECT||'templates'),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:draftRevision,payload:{template:state.template,baseTemplate:state.baseTemplate,deck:state.deck}})});
+    draftRevision=(await res.json()).revision;$('#draftSyncStatus').textContent='工作台草稿已保存到服务端';
+  }catch(e){draftReady=false;draftPending=false;$('#draftSyncStatus').textContent='草稿未同步：'+e.message+'。当前浏览器备份仍保留，可先保存为方案。';}
+  finally{draftSaving=false;if(draftPending)syncDeckDraft();}
+}
 function renderPageList(){
   var box=$('#pageList');
   if(!state.deck.length){box.innerHTML='<div class="hint">暂无页面。加载模板后，在上方选择页号、配置绑定，再点「＋ 新增一页」加入报告。</div>';return;}
@@ -428,7 +453,7 @@ function renderPageList(){
       +(p.condition?' <span style="color:#55637a">if '+esc(p.condition)+'</span>':'')
       +(i===state.current&&editablePage()?' <span style="float:right;font-size:10.5px;color:#c25200">正在编辑</span>':'')
       +'</div>'
-      +'<div style="margin-top:2px">'+(chips||'<span class="hint">未绑定（占位符页可自动填充）</span>')+'</div>'
+      +'<div style="margin-top:2px">'+(chips||'<span class="hint">未绑定（请在当前页的模板目标面板逐项关联）</span>')+'</div>'
       +'<div class="page-tools"><button class="sm move-page" data-i="'+i+'" data-delta="-1" '+(i===0?'disabled':'')+'>上移</button><button class="sm move-page" data-i="'+i+'" data-delta="1" '+(i===state.deck.length-1?'disabled':'')+'>下移</button><button class="sm dg del-page" data-i="'+i+'">从报告移除</button></div>';
     bindPageItemClick(el,i);
     box.appendChild(el);
@@ -479,7 +504,7 @@ function loadCanvasPreview(canvas, cp, source){
   var status=$('#previewStatus');
   canvas.classList.remove('real-preview');canvas.style.backgroundImage='none';
   if(canvas._previewObjectUrl){URL.revokeObjectURL(canvas._previewObjectUrl);canvas._previewObjectUrl=null;}
-  var originalUrl='/api/templates/'+encodeURIComponent(state.template)+'/slides/'+source+'/preview.png?v='+state.previewVersion;
+  var originalUrl=scopedUrl('/api/templates/'+encodeURIComponent(state.template)+'/slides/'+source+'/preview.png?v='+state.previewVersion);
   function showImage(url, message, isBlob){
     var img=new Image();
     img.onload=function(){
@@ -496,15 +521,22 @@ function loadCanvasPreview(canvas, cp, source){
     };
     img.src=url;
   }
+  function showSourceWhileWaiting(){
+    // Keep the exact template visible while PowerPoint prepares the data
+    // render.  This removes the blank-canvas pause on every field change.
+    canvas.style.backgroundImage='url("'+originalUrl+'")';
+    canvas.classList.add('real-preview');
+    status.textContent='原模板预览 · 正在生成数据预览…';
+  }
   if(!$('#chkLivePreview').checked){
     $('#continuationControl').hidden=true;
     status.textContent='正在加载原模板…';showImage(originalUrl,'原模板预览',false);return;
   }
-  status.textContent='正在生成数据预览…';
+  showSourceWhileWaiting();
   var payload={template:state.template,slide:serializeDeckPage(cp||{source:source}),data:state.data||{},page:state.continuationPage||1};
   canvas._previewTimer=setTimeout(async function(){
     try{
-      var res=await fetch('/api/template/live-preview',{method:'POST',headers:{'Content-Type':'application/json'},
+      var res=await fetch(scopedUrl('/api/template/live-preview'),{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify(payload),signal:controller.signal});
       if(!res.ok){
         var err=await res.json().catch(function(){return {};});
@@ -526,7 +558,7 @@ function loadCanvasPreview(canvas, cp, source){
       $('#continuationControl').hidden=true;
       showImage(originalUrl,'数据预览失败，当前显示原模板：'+e.message,false);
     }
-  },250);
+  },450);
 }
 function renderPage(){
   rememberBindingDraft();
@@ -586,6 +618,7 @@ function renderPage(){
   markBound(cp||{bindings:{}});
   hideSelBar();
   refreshObjectNavigator();
+  renderTemplateTargets();
 }
 function boxHtml(kind,name,shapeId,l,t,w,h,inner,zoom,scale){
   function px(v){return v*scale*zoom;}
@@ -670,12 +703,15 @@ function showSelBar(info){
   bar._partialRange=null;
   var chips='';
   var phs=collectPlaceholders(info.name,info.shape_id);
-  chips=phs.map(function(p){
-    var meta=fieldMeta(p);
-    var txt=meta?meta.pathLabel:p;
-    return '<button class="chip-btn" data-path="'+esc(p)+'" title="'+esc(p)+'">'+esc(txt)+'</button>';
+  // A placeholder belongs to the imported PPT, so it is a target label rather
+  // than an HTML source field.  Only offer a same-path chip when the current
+  // form actually exposes that path; never invent a cross-form alias.
+  var targetTags=phs.map(function(p){return '<span class="target-tag">模板目标 {'+esc(p)+'}</span>';}).join(' ');
+  var samePath=phs.filter(function(p){return !!metaFor(p);}).map(function(p){
+    return '<button class="chip-btn" data-path="'+esc(p)+'" title="当前表单存在同路径字段：'+esc(p)+'">同路径字段：'+esc(labelOf(p))+'</button>';
   }).join(' ');
-  var chipsLabel='该对象对应占位符/常用字段（点选即填）：';
+  chips=(targetTags+(samePath?' <span class="hint">可选建议：</span>'+samePath:'' )).trim();
+  var chipsLabel='模板目标占位符（不是表单字段）；如当前表单存在同路径字段，可作为建议：';
   if(info.type==='table_rows'){
     // 表格对象：整表填入表单的表格数据（dfmHist / fileStat / matList / issues …）
     var tblNames=Object.keys(CAT.tables);
@@ -707,8 +743,8 @@ function showSelBar(info){
     +'<button class="sm" id="btnDiscardDraft">撤销未保存修改</button>'
     +'<button class="sm dg" id="btnUnbind">解除绑定</button>'
     +'<button class="sm" id="btnCloseSel">收起</button></div><div id="bindingDraftStatus" class="editor-status" aria-live="polite"></div>'
-    +'<table><tr id="rowSingleSource"><td style="width:130px">关联表单字段（中文名）</td><td>'
-    +'<input type="text" id="inpSource" list="fieldList" placeholder="点击下方建议，或输入/选择字段路径" style="width:100%" value="'+esc(existing?existing.source:'')+'">'
+    +'<table><tr id="rowSingleSource"><td style="width:130px">关联表单字段</td><td>'
+    +'<input type="text" id="inpSource" list="fieldList" placeholder="从下方字段目录选择（无需手写代码）" style="width:100%" value="'+esc(existing?existing.source:'')+'">'
     +'<datalist id="fieldList">'+fieldOptions()+'</datalist>'
     +(chips?'<div style="margin-top:3px"><span class="hint">'+esc(chipsLabel)+'</span>'+chips+'</div>':'')
     +'<div class="hint" id="selHint"></div>'
@@ -943,6 +979,8 @@ function doBind(info){
     var rows=$('#selBar')._partialDraft;
     if(!rows.length){toast('请先选择文字并添加至少一处绑定');return;}
     var options={shape_id:info.shape_id,original_text:info.text,replacements:JSON.parse(JSON.stringify(rows))};
+    var targetPaths=collectPlaceholders(info.name,info.shape_id);
+    if(targetPaths.length)options.template_placeholders=targetPaths.slice();
     if(info.type==='table_cell'){options.row=info.row;options.column=info.col;}
     currentPage().bindings[info.key]={type:'text_replace',source:'f',shape:info.name,required:true,options:options};
     clearBindingDraft(info);persistDeck();renderPageList();renderPage();showSelBar(info);
@@ -953,6 +991,8 @@ function doBind(info){
   var cp=currentPage();
   var selectedType=$('#selBindType').value;
   var spec={type:selectedType,source:path,shape:info.name,required:true,options:{shape_id:info.shape_id}};
+  var targetPaths=collectPlaceholders(info.name,info.shape_id);
+  if(targetPaths.length)spec.options.template_placeholders=targetPaths.slice();
   if(selectedType==='text_template'||selectedType==='formula'){
     var displayTemplate=($('#inpDisplayTemplate')&&$('#inpDisplayTemplate').value)||'';
     if(!displayTemplate.trim()){toast('请填写显示模板');return;}
@@ -1052,7 +1092,8 @@ function renderFieldHint(){
     var m=metaOf(path);
     var val=resolvePath(path);
     var cur=(val!==undefined&&val!==''&&typeof val==='string'&&!String(val).startsWith('data:')&&val.length<60)?(' 当前值:'+val):'';
-    return '<button class="chip-btn" data-path="'+esc(path)+'" title="'+esc(path+(cur?('｜'+cur):''))+'">'+esc(m.pathLabel)+'</button>';
+    var origin=m.sourcePath?('｜原字段 '+m.sourcePath):'';
+    return '<button class="chip-btn" data-path="'+esc(path)+'" title="'+esc(path+origin+(cur?('｜'+cur):''))+'">'+esc(m.pathLabel)+'</button>';
   }
   function section(title,open,paths){
     if(!paths.length)return '';
@@ -1150,6 +1191,10 @@ async function generate(){
   if(!state.deck.length){toast('报告页面为空');return;}
   var slides=buildDeckSlides();
   var data={f:state.data.f||{},t:state.data.t||{},i:state.data.i||{}};
+  // Native HTML projects keep the original snapshot as the source of truth.
+  // Pass it through so the server can normalize source-specific paths and
+  // validate that every imported-PPT target was explicitly bound.
+  if(state.data.runtime)data.runtime=state.data.runtime;
   mask(true);
   try{
     var res=await api('/api/template/generate',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -1196,13 +1241,14 @@ $('#btnSchemeSave').addEventListener('click',async function(){
   if(!name){toast('请先填写方案名称');return;}
   if(!state.template){toast('请先加载模板');return;}
   if(!state.deck.length){toast('报告页面为空，请先添加页面');return;}
+  if(Array.from($('#selScheme').options).some(function(o){return o.value===name;})&&!confirm('方案「'+name+'」已存在。更新此方案并保留旧版本？若要另存，请取消并填写新名称。'))return;
   mask(true);
   try{
     var payload={name:name,template:state.baseTemplate||state.template,description:$('#inpSchemeDesc').value.trim(),
       output_mode:'deck',missing:'keep',slides:buildDeckSlides()};
     var res=await api('/api/schemes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     var out=await res.json();
-    toast('方案已保存：'+name+'（之后在 DFM 表单页填完数据即可一键生成）');
+    toast('方案已保存：'+name+'（之后在对应表单项目中填写数据即可生成）');
     await refreshSchemeList(name);
   }catch(e){toast('保存失败：'+e.message);}
   mask(false);
@@ -1240,18 +1286,33 @@ $('#selScheme').addEventListener('change',updateSchemeHint);
 
 /* ---------------- 启动（恢复上次 deck） ---------------- */
 function restore(){
-  try{var saved=JSON.parse(localStorage.getItem(LS_KEY)||'null');
+  try{var saved=JSON.parse(localStorage.getItem(LS_KEY)||(FORM_APP==='dfm'&&!FORM_PROJECT?localStorage.getItem('dfm_workbench_deck_v1'):null)||'null');
     if(saved&&saved.template){state.template=saved.template;state.baseTemplate=saved.baseTemplate||saved.template;state.deck=saved.deck||[];state.current=0;}}catch(_){ }
 }
-window.addEventListener('DOMContentLoaded',function(){
+window.addEventListener('DOMContentLoaded',async function(){
+try{
+var formApp=await(await api('/api/form-apps/'+FORM_APP)).json();
+CAT=await(await api('/api/form-apps/'+FORM_APP+'/catalog'+(FORM_PROJECT?'?project_id='+encodeURIComponent(FORM_PROJECT):''))).json();
+document.querySelector('header b').textContent=formApp.name+' · PPT 工作台';
+document.title=formApp.name+' · PPT 工作台';
+document.querySelector('header .back').href='/forms?app_id='+FORM_APP;
+document.querySelector('header .back').textContent='← 返回表单应用';
+var projects=(await(await api('/api/form-apps/'+FORM_APP+'/projects')).json()).projects;
+$('#selData').innerHTML=projects.map(function(p){return '<option value="saved:'+p.id+'">'+esc(p.name)+' · 版本 '+p.revision+'</option>';}).join('')+(FORM_APP==='dfm'?'<option value="demo">DFM 示例数据</option><option value="project">旧版项目数据</option>':'<option value="defaults">表单默认值</option>')+'<option value="empty">空数据</option>';
+if(FORM_PROJECT)$('#selData').value='saved:'+FORM_PROJECT;
+else $('#selData').value=FORM_APP==='dfm'?'demo':'defaults';
 restore();
-refreshTemplates().then(function(){
+var draft=await(await api('/api/form-apps/'+FORM_APP+'/drafts/'+(FORM_PROJECT||'templates'))).json();draftRevision=draft.revision;
+if(draft.payload){state.template=draft.payload.template;state.baseTemplate=draft.payload.baseTemplate;state.deck=draft.payload.deck||[];state.current=0;}
+draftReady=true;$('#draftSyncStatus').textContent=draft.payload?'已载入服务端工作台草稿':'工作台修改将自动保存到服务端';
+await refreshTemplates();
   var cp=currentPage();
   if(cp&&cp.template)state.template=cp.template;
   if(state.template){$('#selTemplate').value=state.template;}
-  loadTemplate();
-});
-refreshSchemeList();
+  await loadData();await loadTemplate();
+await refreshSchemeList(FORM_PARAMS.get('scheme'));
+if(FORM_PARAMS.get('scheme'))$('#btnSchemeLoad').click();
+}catch(e){toast('工作台初始化失败：'+e.message);}
 });
 </script>
 <script src="/static/editor_ux.js"></script>

@@ -1,9 +1,17 @@
 # PPT 模板编排与生成能力（pptx-template 路线）完成说明
 
-> 状态日期：2026-09-02  
+> 原始状态日期：2026-09-02；当前增量：2026-09-09
 > 参考实现：<https://github.com/m3dev/pptx-template>  
 > 范围：补齐交接文档第 4/5/10/11/12 节中的“Open XML 定点生成 Worker + Deck 编排”纵向闭环，
 > 不改变现有 `/api/ppt` 默认行为，不引入 PowerPoint COM，不重画模板样式。
+
+> 2026-09-09 增量：引擎继续兼容模板内 `{path}` 占位符，同时由工作台提供显式的“PPT 模板目标 →
+> 当前表单源字段”绑定。导入的 PPT 占位符现在是待选择的目标槽位，不再被当作跨表单通用字段；
+> 原样 HTML 生成会在最终 OOXML 中检查未绑定目标。多表单隔离、源路径规则和旧方案迁移策略见
+> [多表单应用平台交接](FORM_PLATFORM_2026-09-09.md)。
+
+> 预览性能增量：`slide_preview.py` 通过 `tools/preview_worker.ps1` 复用隐藏 PowerPoint 进程，
+> 进程内 LRU 缓存避免相同请求重复渲染；编辑台先显示原模板底图，默认 1280×720 导出。
 
 ## 1. 核心思路（与 pptx-template 一致）
 
@@ -126,7 +134,8 @@ python -m uvicorn app.main:app
 
 ## 5. 测试
 
-新增（共 129 项全绿）：
+新增（本文 2026-09-02 引擎阶段共 129 项全绿；该数字为历史快照，当前全量回归为 Python 223 项、
+Node 12 项）：
 
 - `tests/test_placeholder_scanner.py` — 扫描清单与形状名、zip 往返内容一致
 - `tests/test_text_binding.py` — 混合 run 拆分、保留 rPr、keep/clear/error 策略、字节短路

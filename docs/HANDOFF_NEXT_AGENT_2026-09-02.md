@@ -1,10 +1,22 @@
 # 交接文档：模板绑定/生成引擎 现状与下一步（2026-09-02）
 
+> 2026-09-09 最新架构：先读 [多表单平台交接](FORM_PLATFORM_2026-09-09.md)。已从单 DFM 扩展为 HTML Schema 驱动的独立应用/项目/模板空间，原 DFM 保留。本文以下内容为原模板引擎历史交接。
+
 > 最新图片问题：见 [单元格图片绑定修复](CELL_IMAGE_BINDING_2026-09-03.md)。兼容旧方案 table_cell 误绑图片；跨模板依赖图不再按 XML 内容跨源去重。用户四页混合方案通过 PowerPoint 打开及逐页导出。
 
 > 最新：见 [表格分页与兼容性修复](TABLE_PAGINATION_2026-09-03.md)。已定位并修复页面 tags 被共用、导入 master/layout ID 碰撞及已删除 notes 的悬空引用；上传模板 3 的续页和模板 2+3 混合分页已通过 PowerPoint 实测。下文旧兼容性结论属于历史记录，不代表这两个样本的最新结果；正式 84 页全量组合仍需单独验收。
 
 > 2026-09-03 增量：先读 [方案复用与编辑交互](EDITOR_UX_2026-09-03.md)。用户明确要求复用的是**已保存方案中的一页（含绑定）**，不是只从原始 PPT 模板取页。
+
+> 2026-09-09 增量：模板绑定已切换为“PPT 模板目标驱动”。`/api/template/scan` 返回
+> `binding_targets`，工作台先选择当前页的文本框、图片、表格或占位符目标，再从当前表单应用的
+> 字段目录选择来源；原样 HTML 只保留自己的稳定源路径（例如 `G.cust`），不会自动注入旧 DFM
+> 字段别名。正式生成会扫描最终 OOXML，仍残留未绑定占位符时直接返回错误。详见
+> [多表单应用平台交接](FORM_PLATFORM_2026-09-09.md)和[项目更新记录](CHANGELOG.md)。
+
+> 2026-09-09 预览性能：编辑台在 PowerPoint 返回前保留原模板底图；请求 450ms 防抖，服务端使用
+> 24 条/90 秒进程内 LRU 缓存，相同请求直接复用 PNG；预览导出默认 1280×720。响应头
+> `X-DFM-Preview-Cache` 可区分 `hit`/`miss`。
 
 > 写给接手开发的 Agent/工程师。接手前请先读：
 > - `docs/PPT_TEMPLATE_GENERATOR_HANDOFF.md`（原始产品/架构交接，仍有效）
@@ -18,8 +30,8 @@
 pip install -r requirements.txt
 python -m uvicorn app.main:app --port 8000     # http://127.0.0.1:8000
 node tools/build_field_catalog.js              # 字段中文目录（Schema 变更后重跑）
-python -m unittest discover -s tests -p "test_*.py"   # 当前 195 项
-node --test tests/editor_models.test.cjs             # 9 项前端模型测试
+python -m unittest discover -s tests -p "test_*.py"   # 当前 224 项
+node --test tests/editor_models.test.cjs tests/native_bridge.test.cjs  # 当前 12 项前端模型/桥接测试
 ```
 
 页面：
@@ -140,7 +152,7 @@ GET/POST/DELETE /api/templates(/{id})  上传/列表/删除
 数据上下文 = `{f,t,i}` + `derived` + `calc_results.*.verdict` + `ppt.*`（PPT 展示用组合字段）。
 
 ## 7. 测试
-`tests/` 153 项。与本轮强相关：
+`tests/` 在本文最初交接时为 153 项；截至 2026-09-09 全量为 224 项（以本文 §1 命令为准）。与本轮强相关：
 - `test_explicit_binding_engine.py`（table_rows/columns_map/vMerge/endParaRPr 顺序/缺失跳过）
 - `test_template_engine.py`（deck/in_place/重复/多模板）
 - `test_schemes.py`、`test_template_import_api.py`、`test_template_registry.py`

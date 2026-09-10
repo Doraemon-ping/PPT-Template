@@ -10,6 +10,7 @@ import hashlib
 import json
 import re
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -73,8 +74,28 @@ class SchemeService:
         }
         path = self._path_for(name)
         self.storage.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+        history = self.storage / 'versions' / path.stem
+        history.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            previous = json.loads(path.read_text(encoding='utf-8'))
+            record['created_at'] = previous.get('created_at', now)
+            record['revision'] = int(previous.get('revision', 1)) + 1
+            snapshot = history / f'{record["revision"]-1}.json'
+            if not snapshot.exists(): snapshot.write_text(json.dumps(previous, ensure_ascii=False, indent=2), encoding='utf-8')
+        else:
+            record['revision'] = 1
+        temporary = self.storage / ('.' + uuid.uuid4().hex + '.tmp')
+        temporary.write_text(json.dumps(record, ensure_ascii=False, indent=2), encoding="utf-8")
+        temporary.replace(path)
         return record
+
+    def versions(self, name):
+        current = self.get(name)
+        history = self.storage / 'versions' / self._path_for(name).stem
+        records = [current]
+        for path in history.glob('*.json'):
+            records.append(json.loads(path.read_text(encoding='utf-8')))
+        return sorted(records, key=lambda r: int(r.get('revision', 1)), reverse=True)
 
     # ------------------------------------------------------------------ read
     def list(self) -> List[Dict[str, Any]]:

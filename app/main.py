@@ -10,7 +10,7 @@
   GET  /api/templates                 已注册模板清单（内置 + 用户上传）
   POST /api/templates/upload          导入 .pptx 模板文件
   DELETE /api/templates/{id}          删除用户上传模板
-  POST /api/template/scan             OOXML 占位符扫描（{path} 清单）
+  POST /api/template/scan             OOXML 占位符扫描（{path} 目标清单）
   POST /api/template/inspect          形状清单（绑定选择用）
   POST /api/template/generate         Deck 编排生成（占位符 + 形状绑定替换）
   POST /api/template/live-preview     当前模板页绑定当前数据的真实 PNG 预览
@@ -19,7 +19,13 @@
   POST /api/project/save              保存项目到服务器
 """
 import json
+import hashlib
 import os
+import re
+import sys
+import threading
+import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
@@ -34,8 +40,13 @@ from .demo import demo_state
 from .ppt import build_pptx, safe_filename
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+_FROZEN = bool(getattr(sys, "frozen", False))
+# 打包成独立 exe 后，__file__ 位于解包目录（_internal）内，属于只读资源；
+# 所有可写数据（data/、上传模板、方案、预览等）统一放到 exe 同级目录，
+# 避免写入解包目录造成丢失，也让用户在 exe 旁能直接看到/备份自己的数据。
+APP_ROOT = Path(sys.executable).resolve().parent if _FROZEN else BASE_DIR
 STATIC_DIR = BASE_DIR / "static"
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = APP_ROOT / "data"
 PROJECT_FILE = DATA_DIR / "project.json"
 PPT_V2_TEMPLATE_PATH = BASE_DIR / "templates" / "DFM_Master_v1.pptx"
 PPT_V2_SCHEMA_DIR = BASE_DIR / "app" / "report" / "ppt" / "schemas"
@@ -46,18 +57,111 @@ BUILTIN_TEMPLATE_IDS = ("official", "exact", "pilot", "demo", "table-demo")
 
 TEMPLATE_REGISTRY_SERVICE = None
 
+# Live preview starts a desktop PowerPoint render, which is intentionally
+# expensive.  Keep a small process-local LRU so duplicate requests from the
+# editor (field selection, page navigation, or a repeated retry) do not start
+# another render.  The template fingerprint is part of the key, so changing
+# an uploaded template invalidates old entries automatically.
+_LIVE_PREVIEW_CACHE = OrderedDict()
+_LIVE_PREVIEW_CACHE_LOCK = threading.Lock()
+_LIVE_PREVIEW_CACHE_MAX = 24
+_LIVE_PREVIEW_CACHE_TTL = 90.0
+
+
+def _live_preview_cache_key(template_path: Path, slide_payload: dict, data: dict, page: int) -> str:
+    """Return a stable key for one rendered preview request."""
+    try:
+        stat = Path(template_path).stat()
+        template_fingerprint = {
+            "path": str(Path(template_path).resolve()),
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+        }
+    except OSError:
+        template_fingerprint = {"path": str(template_path)}
+    payload = {
+        "template": template_fingerprint,
+        "slide": slide_payload,
+        "data": data,
+        "page": page,
+    }
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _live_preview_cache_get(key: str):
+    now = time.monotonic()
+    with _LIVE_PREVIEW_CACHE_LOCK:
+        item = _LIVE_PREVIEW_CACHE.pop(key, None)
+        if item is None:
+            return None
+        created, content, meta = item
+        if now - created > _LIVE_PREVIEW_CACHE_TTL:
+            return None
+        _LIVE_PREVIEW_CACHE[key] = (created, content, meta)
+        return content, meta
+
+
+def _live_preview_cache_put(key: str, content: bytes, meta: dict):
+    with _LIVE_PREVIEW_CACHE_LOCK:
+        _LIVE_PREVIEW_CACHE.pop(key, None)
+        _LIVE_PREVIEW_CACHE[key] = (time.monotonic(), content, dict(meta))
+        while len(_LIVE_PREVIEW_CACHE) > _LIVE_PREVIEW_CACHE_MAX:
+            _LIVE_PREVIEW_CACHE.popitem(last=False)
+
+from .form_platform import FORM_SCOPE, PlatformStore, router_for
+
+def _platform():
+    return PlatformStore(DATA_DIR / 'form_platform')
+
+def _scope_root():
+    scope = FORM_SCOPE.get()
+    if scope == 'dfm':
+        return APP_ROOT
+    _platform().application(scope)
+    return DATA_DIR / 'form_platform' / 'applications' / scope
+
 
 def _registry() -> "TemplateRegistry":
     """Lazy singleton that also serves user-uploaded templates."""
     global TEMPLATE_REGISTRY_SERVICE
+    if FORM_SCOPE.get() != 'dfm':
+        from .report.ppt.template_registry import TemplateRegistry
+        return TemplateRegistry(_scope_root(), include_builtins=False)
     if TEMPLATE_REGISTRY_SERVICE is None:
         from .report.ppt.template_registry import TemplateRegistry
 
-        TEMPLATE_REGISTRY_SERVICE = TemplateRegistry(BASE_DIR)
+        TEMPLATE_REGISTRY_SERVICE = TemplateRegistry(APP_ROOT)
     return TEMPLATE_REGISTRY_SERVICE
 
 
 app = FastAPI(title="HPDC DFM 报告自动生成工具", version="1.0")
+app.include_router(router_for(_platform, STATIC_DIR))
+
+@app.middleware('http')
+async def form_application_scope(request, call_next):
+    scope = request.query_params.get('app_id', 'dfm')
+    if scope != 'dfm':
+        try:
+            _platform().application(scope)
+        except HTTPException as exc:
+            return JSONResponse({'detail': exc.detail}, status_code=exc.status_code)
+    token = FORM_SCOPE.set(scope)
+    try:
+        return await call_next(request)
+    finally:
+        FORM_SCOPE.reset(token)
+
+@app.get('/forms')
+def form_center():
+    return FileResponse(STATIC_DIR / 'form_center.html')
+
+@app.post('/api/form-apps/dfm/import-legacy-project')
+def import_legacy_project():
+    if not PROJECT_FILE.exists():
+        raise HTTPException(404, '没有旧版服务器项目')
+    data = json.loads(PROJECT_FILE.read_text(encoding='utf-8'))
+    return _platform().save_project('dfm', '旧版项目 · ' + (data.get('f', {}).get('projName') or 'DFM'), data)
 
 
 class CalcRequest(BaseModel):
@@ -162,10 +266,13 @@ SCHEME_SERVICE = None
 def _schemes() -> "SchemeService":
     """Lazy singleton for persisted binding schemes under ``data/schemes/``."""
     global SCHEME_SERVICE
+    if FORM_SCOPE.get() != 'dfm':
+        from .report.ppt.scheme_service import SchemeService
+        return SchemeService(_scope_root())
     if SCHEME_SERVICE is None:
         from .report.ppt.scheme_service import SchemeService
 
-        SCHEME_SERVICE = SchemeService(BASE_DIR)
+        SCHEME_SERVICE = SchemeService(APP_ROOT)
     return SCHEME_SERVICE
 
 
@@ -185,6 +292,65 @@ def _template_map(base_template: str, slides) -> dict:
         except TemplateRegistryError as e:
             raise HTTPException(status_code=404, detail=str(e)) from e
     return mapping
+
+
+def _native_unresolved_placeholders(buffer: bytes, data: Dict[str, Any]) -> list[str]:
+    """Return target placeholders still present after a native-form render.
+
+    Native HTML applications expose their own source paths.  The imported PPT
+    template defines the target slots, so a native report must not silently
+    download a deck containing ``{f.someOtherName}`` just because no source
+    field was selected for that slot.  We inspect the final OOXML package,
+    after explicit shape bindings have run, which avoids false positives for a
+    placeholder that an explicit binding replaced.
+    """
+    runtime = data.get('runtime') if isinstance(data, dict) else None
+    if not isinstance(runtime, dict) or runtime.get('adapter') != 'dfm_quote_v1':
+        return []
+    from .report.ppt.openxml.placeholder_scanner import PlaceholderScanner
+    try:
+        scan = PlaceholderScanner().scan(buffer)
+    except Exception:
+        return []
+    return list(scan.placeholder_paths)
+
+
+def _deck_uses_legacy_native_names(slides) -> bool:
+    """Detect an old scheme that explicitly names non-source native paths.
+
+    Native source paths end in the collision-safe ten-hex digest generated by
+    ``native_forms.key``.  Any scoped path without that suffix is a historical
+    or manually-authored compatibility path.  This avoids maintaining a list
+    of business names and keeps the rule valid for future adapters.
+    """
+    for slide in slides or []:
+        bindings = slide.bindings if hasattr(slide, 'bindings') else (slide or {}).get('bindings', {})
+        for spec in (bindings or {}).values():
+            source = spec.source if hasattr(spec, 'source') else (spec or {}).get('source', '')
+            options = spec.options if hasattr(spec, 'options') else (spec or {}).get('options', {})
+            values = [source]
+            if isinstance(options, dict):
+                values += [r.get('source', '') for r in options.get('replacements', []) if isinstance(r, dict)]
+                values += re.findall(r'\{([A-Za-z_][A-Za-z0-9_.\[\]-]*)\}', str(options.get('template', '')))
+            for path in values:
+                if not isinstance(path, str):
+                    continue
+                match = re.match(r'^(f|t|i)\.([^\[]+)(?:\[(\d+)\])?$', path)
+                if match and not re.search(r'_[0-9a-f]{10}$', match.group(2), re.IGNORECASE):
+                    return True
+    return False
+
+
+def _native_unbound_targets(result, data, *, allow_legacy=False) -> list[str]:
+    """Report unresolved native-form template targets without blocking output.
+
+    A partially bound imported template is still useful: with ``missing=keep``
+    the untouched target remains exactly as it appeared in the source PPT.  The
+    response header exposes the count for clients that want to show a warning.
+    """
+    if allow_legacy:
+        return []
+    return _native_unresolved_placeholders(result.buffer, data)
 
 
 @app.get("/")
@@ -362,7 +528,27 @@ def api_template_live_preview(req: TemplateLivePreviewRequest):
         slide_payload["template"] = None
         # Editing always shows this page, even when its report condition is false.
         slide_payload["condition"] = None
-        context = build_data_context(req.data)
+        preview_cache_key = _live_preview_cache_key(record.path, slide_payload, req.data, req.page)
+        cached = _live_preview_cache_get(preview_cache_key)
+        if cached is not None:
+            content, meta = cached
+            return Response(content=content, media_type="image/png", headers={
+                "Cache-Control": "no-store", "X-DFM-Preview-Cache": "hit",
+                "X-DFM-Preview-Skipped": str(meta["skipped"]),
+                "X-DFM-Preview-Pages": str(meta["pages"]),
+                "X-DFM-Preview-Page": str(meta["page"]),
+            })
+        binding_sources = []
+        for spec in slide_payload.get('bindings', {}).values():
+            if spec.get('source'):
+                binding_sources.append(spec['source'])
+            options = spec.get('options') or {}
+            binding_sources.extend(
+                item.get('source', '') for item in options.get('replacements', [])
+                if isinstance(item, dict) and item.get('source')
+            )
+            binding_sources.extend(re.findall(r'\{([A-Za-z_][A-Za-z0-9_.\[\]-]*)\}', str(options.get('template', ''))))
+        context = build_data_context(req.data, binding_sources=binding_sources)
         scopes = [context]
         if req.slide.repeat:
             items, found = PathResolver((context,)).resolve(req.slide.repeat)
@@ -394,6 +580,12 @@ def api_template_live_preview(req: TemplateLivePreviewRequest):
                 pptx_path, req.slide.source, temp_root / "rendered"
             )
             content = png_path.read_bytes()
+        preview_meta = {
+            "skipped": len(missing_bindings) + missing_segments,
+            "pages": generated.stats['preview_page_count'],
+            "page": generated.stats['preview_page'],
+        }
+        _live_preview_cache_put(preview_cache_key, content, preview_meta)
     except TemplateRegistryError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except SlidePreviewError as e:
@@ -401,9 +593,10 @@ def api_template_live_preview(req: TemplateLivePreviewRequest):
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"实时预览生成失败：{e}") from e
     return Response(content=content, media_type="image/png", headers={
-        "Cache-Control": "no-store", "X-DFM-Preview-Skipped": str(len(missing_bindings) + missing_segments),
-        "X-DFM-Preview-Pages": str(generated.stats['preview_page_count']),
-        "X-DFM-Preview-Page": str(generated.stats['preview_page']),
+        "Cache-Control": "no-store", "X-DFM-Preview-Cache": "miss",
+        "X-DFM-Preview-Skipped": str(preview_meta["skipped"]),
+        "X-DFM-Preview-Pages": str(preview_meta["pages"]),
+        "X-DFM-Preview-Page": str(preview_meta["page"]),
     })
 
 
@@ -476,6 +669,10 @@ def api_template_generate(req: TemplateGenerateRequest):
             slides=[DeckSlide(**spec.model_dump()) for spec in req.slides],
         )
         result = TemplateEngine(path).generate(deck, req.data, template_map=template_map)
+        unbound_targets = _native_unbound_targets(
+            result, req.data,
+            allow_legacy=_deck_uses_legacy_native_names(req.slides),
+        )
     except HTTPException:
         raise
     except Exception as e:  # noqa: BLE001
@@ -501,6 +698,7 @@ def api_template_generate(req: TemplateGenerateRequest):
             "X-DFM-Images-Missing": str(len(stats.get("images_missing", []))),
             "X-DFM-Bindings-Applied": str(stats.get("bindings_applied", 0)),
             "X-DFM-Missing-Placeholders": str(len(stats.get("text_missing") or [])),
+            "X-DFM-Unbound-Targets": str(len(unbound_targets)),
         },
     )
 
@@ -565,6 +763,14 @@ def api_schemes_get(name: str):
     except SchemeError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
+@app.get('/api/schemes/{name}/versions')
+def api_scheme_versions(name: str):
+    from .report.ppt.scheme_service import SchemeError
+    try:
+        return {'versions': _schemes().versions(name)}
+    except SchemeError as e:
+        raise HTTPException(404, str(e)) from e
+
 
 @app.delete("/api/schemes/{name}")
 def api_schemes_delete(name: str):
@@ -597,6 +803,10 @@ def api_schemes_generate(name: str, req: SchemeGenerateRequest):
             slides=[DeckSlide(**slide) for slide in deck_data.get("slides", [])],
         )
         result = TemplateEngine(path).generate(deck, req.data, template_map=template_map)
+        unbound_targets = _native_unbound_targets(
+            result, req.data,
+            allow_legacy=_deck_uses_legacy_native_names(deck.slides),
+        )
     except SchemeError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except HTTPException:
@@ -624,6 +834,7 @@ def api_schemes_generate(name: str, req: SchemeGenerateRequest):
             "X-DFM-Images-Bound": str(stats.get("images_bound", 0)),
             "X-DFM-Images-Missing": str(len(stats.get("images_missing", []))),
             "X-DFM-Bindings-Applied": str(stats.get("bindings_applied", 0)),
+            "X-DFM-Unbound-Targets": str(len(unbound_targets)),
         },
     )
 
@@ -648,9 +859,9 @@ def api_project_load():
 def api_project_save(req: SaveRequest):
     try:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
-        with open(PROJECT_FILE, "w", encoding="utf-8") as fp:
-            json.dump({"f": req.f, "t": req.t, "i": req.i}, fp, ensure_ascii=False, indent=2)
-        return {"ok": True, "path": str(PROJECT_FILE)}
+        data = {"f": req.f, "t": req.t, "i": req.i}
+        record = _platform().save_project('dfm', req.f.get('projName') or req.f.get('partNo') or 'DFM 项目', data)
+        return {"ok": True, "project": record, "hint": "已保存为新项目，可在表单中心管理"}
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=500, detail=f"保存失败：{e}") from e
 

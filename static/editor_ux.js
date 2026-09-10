@@ -71,6 +71,50 @@ function refreshObjectNavigator(){
   $$('#canvas .sbox,#canvas .k-cell').forEach(function(el){el.tabIndex=0;el.setAttribute('role','button');
     el.setAttribute('aria-label',(el.dataset.name||'对象')+(el.classList.contains('k-cell')?' 第'+(+el.dataset.row+1)+'行'+(+el.dataset.col+1)+'列':''));});
 }
+/* Imported PPT placeholders are target slots. Keep them separate from the
+ * HTML field catalog so the user always sees the direction: PPT target ->
+ * current form source. */
+function renderTemplateTargets(){
+  var box=$('#templateTargets');if(!box)return;
+  var page=editablePage()||currentPage();
+  var slide=page&&slidesOf().find(function(x){return x.slide_index===page.source;});
+  var shapes=(slide&&slide.shapes)||[];
+  var targets=shapes.filter(function(sh){return (sh.placeholder_paths||[]).length;});
+  if(!targets.length){box.hidden=true;box.innerHTML='';return;}
+  var bindings=(page&&page.bindings)||{};
+  function boundFor(sh){
+    return Object.keys(bindings).map(function(k){return bindings[k];}).filter(function(b){
+      return b && ((b.options&&String(b.options.shape_id)===String(sh.shape_id)) ||
+        ((!b.options||b.options.shape_id==null) && b.shape===sh.shape_name));
+    });
+  }
+  var rows=targets.map(function(sh){
+    var bs=boundFor(sh),paths=sh.placeholder_paths||[];
+    var mapped=bs.length?bs.map(function(b){
+      if(b.type==='text_replace')return '局部替换 '+((b.options&&b.options.replacements)||[]).length+' 处';
+      return b.source||'已绑定';
+    }).join('；'):'';
+    var pending=!bs.length;
+    return '<div class="target-row '+(pending?'pending':'')+'">'
+      +'<div style="flex:1"><div><b>'+esc(sh.shape_name)+'</b> <span class="hint">'+esc(sh.kind)+' · ID '+esc(sh.shape_id)+'</span></div>'
+      +paths.map(function(p){return '<span class="target-tag">{'+esc(p)+'}</span>';}).join(' ')
+      +(mapped?'<div class="hint">当前来源：<span class="mono">'+esc(mapped)+'</span></div>':'<div class="hint">请选择来源表单字段</div>')
+      +'</div><span class="target-state">'+(pending?'待绑定':'✓ 已绑定')+'</span>'
+      +'<button class="sm target-select" data-shape-id="'+esc(sh.shape_id)+'" data-shape-name="'+esc(sh.shape_name)+'">选择对象</button></div>';
+  }).join('');
+  box.hidden=false;
+  box.innerHTML='<h4>当前 PPT 页的模板目标（'+targets.length+' 个对象）</h4>'
+    +'<div class="hint">占位符来自导入的 PPT。它们不会自动映射到固定业务字段，请为每个对象选择当前 HTML 表单字段。</div>'
+    +rows;
+}
+$('#templateTargets').addEventListener('click',function(e){
+  var b=e.target.closest('.target-select');if(!b)return;
+  var id=b.getAttribute('data-shape-id'),name=b.getAttribute('data-shape-name');
+  var el=$$('#canvas .sbox').find(function(x){return String(x.dataset.shapeid)===String(id);})
+    ||$$('#canvas .sbox').find(function(x){return x.dataset.name===name;});
+  if(!el){toast('该模板目标当前不在画布中，请重新加载模板页');return;}
+  selectCanvasObject(el);$('#selBar').scrollIntoView({behavior:'smooth',block:'start'});
+});
 function syncObjectSelection(key){
   if(!Array.from($('#selObject').options).some(function(o){return o.value===key;})){$('#objectSearch').value='';refreshObjectNavigator();}
   $('#selObject').value=key;
@@ -91,7 +135,7 @@ $('#pageList').addEventListener('click',function(e){var button=e.target.closest(
 function formulaEntries(){
   var entries=CAT.fields.map(function(f){return {path:f.path,label:f.label};});
   Object.keys(CAT.derived).forEach(function(k){entries.push({path:'derived.'+k,label:CAT.derived[k]});});
-  Object.keys(formulaExtraFields).forEach(function(path){entries.push({path:path,label:formulaExtraFields[path]});});
+  if(FORM_APP==='dfm')Object.keys(formulaExtraFields).forEach(function(path){entries.push({path:path,label:formulaExtraFields[path]});});
   return entries;
 }
 function initFormulaEditor(existing,draft){

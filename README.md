@@ -1,17 +1,18 @@
 # HPDC DFM 报告自动生成工具（FastAPI 版）
 
+> 完整更新记录见 [项目更新记录](docs/CHANGELOG.md)；本文保留快速开始、API 和当前工作台用法。
+
+> 维护约定：后续每次功能或修复都要同步追加 [项目更新记录](docs/CHANGELOG.md)，并更新受影响的接口/交接文档。
+
+> 2026-09-09：新增 [表单中心](http://127.0.0.1:8000/forms)，支持 HTML 字段识别与确认、复杂 DFM/报价 HTML 的原样运行+数据桥接、独立表单应用、命名数据项目/历史恢复、按应用隔离的 PPT 工作台和服务端草稿。实现、部署边界与接手说明见 [多表单平台交接](docs/FORM_PLATFORM_2026-09-09.md)。当前为本机服务端存储，尚未加入多用户登录权限或云端部署。
+
 > 图片绑定修复（2026-09-03）：支持向单元格区域填图片，兼容旧方案误存的文本类型；修复跨模板相同 XML 不同依赖误复用。详见 [单元格图片绑定修复](docs/CELL_IMAGE_BINDING_2026-09-03.md)。
 
 > 表格分页修复（2026-09-03）：整表绑定默认按原表格区域自动续页，数据行采用统一参考样式；实时预览可切换续页。详见 [表格分页与兼容性修复](docs/TABLE_PAGINATION_2026-09-03.md)。
 
 > 更新（2026-09-03）：编辑台新增**已保存方案的单页复用**、中文公式编辑器、对象搜索与绑定草稿。操作与开发说明见 [方案复用与编辑交互](docs/EDITOR_UX_2026-09-03.md)。
 
-> ⚠️ 交接近况（2026-09-02）：如需换 Agent 接手，**先读**：
-> [交接：模板绑定/生成引擎现状与下一步](docs/HANDOFF_NEXT_AGENT_2026-09-02.md)
->
-> 另请阅读：
-> [PPT 模板生成器开发交接文档](docs/PPT_TEMPLATE_GENERATOR_HANDOFF.md)
-> [PPT 模板编排与生成能力完成说明](docs/PPT_TEMPLATE_ENGINE_COMPLETION.md)
+> 当前开发上下文唯一入口：[当前开发上下文](docs/DEVELOPMENT_CONTEXT_CURRENT.md)。按日期命名的交接文档仅用于历史追溯。
 
 由原单文件 HTML 工具（`HPDC_DFM_Generator_A12.html`）改造为 **Python FastAPI 项目**：
 
@@ -67,6 +68,9 @@ uvicorn app.main:app --reload
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/` | 前端界面 |
+| GET | `/forms` | 多表单应用中心：导入 HTML、管理数据项目并进入对应 PPT 工作台 |
+| GET/POST | `/api/form-apps` | 表单应用列表、普通 HTML 字段发现与原样 HTML 导入 |
+| GET/POST/PUT | `/api/form-apps/{app_id}/projects*` | 按应用隔离的数据项目、服务端草稿、版本历史、归档和 JSON 导出 |
 | POST | `/api/calc` | 工艺计算。请求 `{f, t, apply_machine}`，返回 `{derived, machine_fill, results}`（结果含界面 HTML 与 PPT 结论文本） |
 | POST | `/api/ppt` | 生成 PPT（旧版 47 页）。请求 `{f, t, i}`（i 为 base64 图片），返回 `.pptx` 文件 |
 | POST | `/api/ppt/preview-v2` | Named-Shape 新引擎预览；默认关闭，请求结构与旧 PPT 接口一致 |
@@ -74,7 +78,7 @@ uvicorn app.main:app --reload
 | GET | `/api/templates` | 已注册模板清单（内置 official/exact/pilot/demo/table-demo + 用户上传） |
 | POST | `/api/templates/upload` | 导入 .pptx 模板文件（multipart `file`），持久化并注册 |
 | DELETE | `/api/templates/{id}` | 删除用户上传的模板 |
-| POST | `/api/template/scan` | OOXML 占位符扫描：`{template}` → `{slide_count, placeholder_paths, slides[]}` |
+| POST | `/api/template/scan` | OOXML 占位符与模板目标扫描：`{template}` → `{slide_count, placeholder_paths, binding_targets, slides[]}` |
 | POST | `/api/template/inspect` | 形状清单检查：每页形状名/类型/文本/表格行列（绑定选择用） |
 | POST | `/api/template/formula-preview` | 中文公式编辑器预览：`{expression, data}` → PNG；缺字段数量见 `X-DFM-Formula-Missing`；仅编排现有数据，不执行用户代码 |
 | POST | `/api/template/generate` | Deck 编排生成：`{template, output_mode, missing, slides[], data}` → `.pptx` |
@@ -86,6 +90,10 @@ uvicorn app.main:app --reload
 | GET | `/api/demo` | 示例项目数据 |
 | GET | `/api/project/load` | 载入服务器保存的项目（`data/project.json`） |
 | POST | `/api/project/save` | 保存项目到服务器 |
+
+表单应用的模板、方案和草稿均按 `app_id` 隔离。普通 HTML 进入统一字段表单；受支持的复杂
+DFM/报价 HTML 进入“原样运行 HTML + 数据桥接”，PPT 工作台不会把旧 DFM 字段名自动当作新表单字段。
+完整接口、数据模型、部署边界和迁移说明见 [多表单应用平台交接](docs/FORM_PLATFORM_2026-09-09.md)。
 
 前端行为说明：
 
@@ -121,6 +129,10 @@ curl -X POST http://127.0.0.1:8000/api/template/generate -H "Content-Type: appli
 网页表单里用户填写的字段（项目信息 `f.*`、问题表格 `t.issues`、图片 `i.*`、自动派生
 `derived.*`、计算结论 `calc_results.*`），生成替换内容后的 PPT：
 
+> 原页 PNG 和实时数据 PNG 预览需要运行服务的 Windows 机器安装桌面版 Microsoft PowerPoint。
+> 模板生成下载本身不依赖 Office。发布目标机时请分发 `release/DFM报告生成器_win64` 或其 ZIP，
+> 不要直接分发 `packaging/build_dist` 中间目录。
+
 1. **导入模板**：内置模板或上传任意 `.pptx`（服务器持久化到 `data/templates/`）。
 2. **原页点选**：`GET /api/templates/{id}/slides/{n}/preview.png` 调用桌面 PowerPoint 导出并缓存
    原页 PNG；`/api/template/inspect` 返回 EMU 坐标和表格逐格坐标，前端仅叠加透明选择层。
@@ -141,19 +153,24 @@ curl -X POST http://127.0.0.1:8000/api/template/generate -H "Content-Type: appli
    - **跨模板拼页**：可先取模板 A 的几页，再切换到模板 B 取几页——切换/加载模板不会清空
      已有页面与绑定；每页记录所属模板，生成时把不同模板的页面（含版式/母版依赖）合成
      一份 PPTX（同一报告可混 A、B 模板页面）。
-4. **实时数据预览**：默认开启，切换模板页、数据来源或修改绑定后，自动调用
+4. **实时数据预览**：默认开启，画布先显示原模板底图，再调用
    `POST /api/template/live-preview`。后端在临时副本中按当前绑定填入数据，由 PowerPoint
    渲染当前页 PNG，原模板和已保存方案不变。重复页展示数组首条数据；编辑预览不应用显示条件。
+   输入变化采用 450ms 防抖；相同模板/页/绑定/数据会命中服务端短期缓存。预览默认以 1280×720
+   导出，保持 16:9 选区精度并减少等待。
    缺失数据的绑定保留原对象并显示数量提示；渲染失败会明确提示并回退原模板。
-   取消「实时数据预览」可查看未填入数据的原模板。真实渲染需要数秒，并非逐帧刷新；
+   取消「实时数据预览」可查看未填入数据的原模板。首次启动 PowerPoint 可能需要数秒，
+   服务端会复用隐藏渲染进程，后续页面更新通常更快；预览并非逐帧刷新；
    快速切换使用防抖、取消请求及序号校验，防止旧结果覆盖新选择。
-5. **生成**：与占位符路线共用 `/api/template/generate`（Deck 中每页携带 `bindings` 与可选 `template`）。
+5. **生成**：与占位符路线共用 `/api/template/generate`（Deck 中每页携带 `bindings` 与可选 `template`）。导入的 PPT 占位符是目标槽位，工作台保存的显式 `PPT 目标 → 表单源` 关系优先；原样 HTML 应用不会自动套用固定的客户/零件字段别名。
    图片绑定（`image` / `image_region`）缺少数据或值为空时，正式生成也保留模板原对象，
    不因缺图中断；编辑台和表单页显示缺图数量。补充图片后再次生成即可替换。
    已提供但损坏的图片、缺失的必需文本字段仍报错；不会删除已有绑定。
 
-无占位符的模板（含官方 84 页模板的自动命名对象）同样适用；含 `{f.xxx}` 占位符的模板
-也支持自动填充。绑定记录保存在浏览器 localStorage，可随时续编。
+无占位符的模板（含官方 84 页模板的自动命名对象）同样适用。含 `{f.xxx}` 占位符的模板
+会在当前页的「模板目标」面板中逐个列出，选择来源字段后才会写入方案；绑定记录保存在浏览器
+localStorage 和服务端草稿，可随时续编。对原样 HTML 应用，未绑定的模板目标不再阻止生成；
+默认 `missing=keep` 时保留 PPT 模板中的原内容（包括原占位符）。
 
 ### 产品分析/压铸设备选择单页（`2.pptx`）
 

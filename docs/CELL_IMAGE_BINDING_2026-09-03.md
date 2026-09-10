@@ -1,5 +1,7 @@
 # 单元格图片绑定修复
 
+> 本文记录 2026-09-03 的专项修复；当前整体能力与后续变更见 [项目更新记录](CHANGELOG.md)。
+
 ## 原因与修复
 
 - 用户四页方案最后一页 `表格 8 / shape_id=11 / row=3,column=1` 绑定了 `i.productRunnerFrontImg[0]`，但旧编辑台存成 `table_cell` 文本类型。该位置实际为合并单元格的延续区域，无 `a:t`，因此出现 `slide88.xml: shape has no text node to bind`。slide88 是重建包的内部部件编号，并非用户报告第 88 页。

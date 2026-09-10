@@ -54,6 +54,17 @@ class TemplateScan:
     warnings: tuple = ()
 
     def to_dict(self) -> dict:
+        targets = [
+            {
+                "target_id": f"slide:{item.slide_index}:shape:{item.shape_name}:path:{item.path}",
+                "slide_index": item.slide_index,
+                "shape_name": item.shape_name,
+                "path": item.path,
+                "occurrences": item.occurrences,
+            }
+            for slide in self.slides
+            for item in slide.placeholders
+        ]
         return {
             "slide_count": self.slide_count,
             "placeholder_count": self.placeholder_count,
@@ -62,6 +73,9 @@ class TemplateScan:
             "notes_slide_count": self.notes_slide_count,
             "ole_part_count": self.ole_part_count,
             "warnings": list(self.warnings),
+            # A flattened target manifest is convenient for editors: these
+            # paths describe imported PPT slots, not source form fields.
+            "binding_targets": targets,
             "slides": [
                 {
                     "slide_index": slide.slide_index,

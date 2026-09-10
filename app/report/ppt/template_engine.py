@@ -15,6 +15,7 @@ runs PowerPoint COM, and never recomputes DFM conclusions (they come from
 ``app.calc`` as data).
 """
 import io
+import re
 import time
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -92,7 +93,18 @@ class TemplateEngine:
         except OoxmlPackageError as exc:
             raise TemplateEngineError(f"template load failed: {exc}") from exc
 
-        context = build_data_context(data)
+        binding_sources = []
+        for slide in deck.slides:
+            for spec in slide.bindings.values():
+                if spec.source:
+                    binding_sources.append(spec.source)
+                template = (spec.options or {}).get('template', '')
+                if isinstance(template, str):
+                    binding_sources.extend(re.findall(r'\{([A-Za-z_][A-Za-z0-9_.\[\]-]*)\}', template))
+                for segment in (spec.options or {}).get('replacements', []) or []:
+                    if isinstance(segment, dict) and segment.get('source'):
+                        binding_sources.append(segment['source'])
+        context = build_data_context(data, binding_sources=binding_sources)
         plan = DeckPlanner().expand(deck, context)
         if preview_first_item:
             plan = replace(plan, ops=tuple(replace(op, items=op.items[:1]) for op in plan.ops))
@@ -422,8 +434,45 @@ class TemplateEngine:
             return 0
 
 
-def build_data_context(data: Mapping[str, Any]) -> Dict[str, Any]:
-    """Merge raw ``{f,t,i}`` with derived values and calc verdict texts."""
+def build_data_context(data: Mapping[str, Any], *, binding_sources=None) -> Dict[str, Any]:
+    """Build scoped form data; only the built-in DFM application computes DFM values."""
+    from app.form_platform import FORM_SCOPE
+    if FORM_SCOPE.get() != 'dfm':
+        context = {key: dict(data.get(key) or {}) for key in ('f', 't', 'i', 'derived', 'calc_results')}
+        runtime = data.get('runtime')
+        if isinstance(runtime, dict) and runtime.get('adapter') == 'dfm_quote_v1':
+            # Native HTML data is normalized using the source-specific catalog
+            # paths.  PPT target placeholders are resolved only through the
+            # explicit bindings saved by the template editor.
+            from app.native_forms import normalize
+            projected, _ = normalize(runtime, include_legacy_aliases=False)
+            # Replace the persisted projection instead of merging it.  This
+            # prevents an old project row containing ``f.custName`` aliases
+            # from bypassing the template-driven binding contract.
+            for key in ('f', 't', 'i'):
+                context[key] = dict(projected[key])
+            # A historical scheme may explicitly contain a legacy DFM source
+            # such as ``f.custName``.  Resolve only those exact paths, and only
+            # when the scheme asked for them.  This is a migration escape hatch
+            # rather than a catalog-wide alias or an automatic mapping rule.
+            requested = {str(path) for path in (binding_sources or []) if isinstance(path, str)}
+            if requested:
+                legacy, _ = normalize(runtime, include_legacy_aliases=True)
+                for path in requested:
+                    match = re.match(r'^(f|t|i)\.([^\[]+)(?:\[(\d+)\])?$', path)
+                    if not match:
+                        continue
+                    scope, name, index = match.groups()
+                    if name not in legacy.get(scope, {}):
+                        continue
+                    value = legacy[scope][name]
+                    if index is not None:
+                        try:
+                            value = value[int(index)]
+                        except (IndexError, TypeError):
+                            continue
+                    context[scope][name] = value
+        return context
     f = dict(data.get("f") or {})
     t = dict(data.get("t") or {})
     i = dict(data.get("i") or {})

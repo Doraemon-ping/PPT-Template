@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>表单中心 · 数据与报告</title><link rel="stylesheet" href="/static/form_center.css"></head>
+<body>
+<header><a href="/forms" class="brand">表单中心</a><span>从表单数据到模板报告</span><a href="/" class="legacy">打开原 DFM 表单</a></header>
+<main>
+<section id="home"><div class="heading"><div><p class="eyebrow">我的表单应用</p><h1>每种表单，一个工作空间</h1><p class="muted">分别管理数据项目、PPT 模板和绑定方案。项目保存到服务端，每次更新保留版本。</p></div><button id="importHtml" class="primary">＋ 导入 HTML 表单</button><input id="htmlFile" type="file" accept=".html,.htm" hidden></div><div id="appList" class="app-grid"></div></section>
+<section id="workspace" hidden><a href="/forms">← 全部表单</a><div class="heading"><div><p class="eyebrow">表单应用</p><h1 id="appName"></h1><p id="appSummary" class="muted"></p></div><div class="actions"><button id="newProject" class="primary">＋ 新建数据项目</button><button id="openTemplates">PPT 模板工作台</button></div></div>
+<nav class="tabs"><button id="tabProjects" class="active">数据项目</button><button id="tabSchemes">模板方案</button><button id="tabFields">参数字段</button></nav>
+<div id="projectsPanel"><div class="toolbar"><input id="searchProject" placeholder="搜索项目名称" aria-label="搜索项目"><label><input id="showArchived" type="checkbox"> 已归档项目</label><button id="importProject">导入项目 JSON</button><button id="importLegacy" hidden>导入旧版服务器项目</button><input id="projectFile" type="file" accept=".json" hidden></div><div id="projectList"></div></div>
+<div id="schemesPanel" hidden><p class="muted">方案包含模板页和字段绑定。同一方案可用于此表单的不同数据项目。</p><div id="schemeList"></div></div>
+<div id="fieldsPanel" hidden><p class="muted">以下参数只属于当前表单。字段标识在创建后保持稳定，供已有 PPT 绑定使用。</p><div id="fieldList"></div></div>
+</section>
+<section id="editor" hidden><button id="backProjects" class="link">← 返回项目列表</button><div class="heading"><div><p id="projectApp" class="eyebrow"></p><h1 id="projectTitle">新建项目</h1><p id="saveState" role="status" class="muted">尚未保存</p></div><div class="actions"><button id="saveProject" class="primary">保存项目</button><button id="saveCopy">另存为新项目</button><button id="projectToPpt">进入 PPT 工作台</button></div></div>
+<label class="name-field">项目名称<input id="projectName" required maxlength="160" placeholder="例如：客户 A · 9 月检查报告"></label>
+<div class="toolbar"><button id="versions">历史版本</button><button id="exportProject">导出 JSON</button><select id="generateScheme" aria-label="选择报告方案"></select><button id="generateReport">按方案生成 PPT</button></div>
+<p id="nativeStatus" class="notice" hidden>原样运行：原 HTML 的计算与交互保留；请使用上方「保存项目」保存到平台。</p><div id="nativeContainer" hidden></div><form id="dataForm"></form></section>
+</main>
+<dialog id="importDialog"><div class="heading"><div><p class="eyebrow">HTML 导入 · 确认字段</p><h2>检查识别结果</h2></div><button data-close="importDialog">关闭</button></div><label>表单应用名称<input id="newAppName" maxlength="100"></label><div id="importWarnings" class="notice"></div><p class="muted">可修正中文名称、字段类型和选项，删除无关控件，补充未识别字段。每个表单会生成独立的参数目录。</p><div id="schemaEditor"></div><button id="addField">＋ 添加字段</button><button id="addTable">＋ 添加明细表</button><div class="dialog-footer"><span id="importStatus" role="status"></span><button id="createApp" class="primary">创建表单并进入</button></div></dialog>
+<dialog id="versionDialog"><div class="heading"><h2>历史版本</h2><button data-close="versionDialog">关闭</button></div><p class="muted">恢复时会创建新版本，原有历史继续保留。</p><div id="versionList"></div></dialog>
+<div id="message" role="status" hidden></div><script src="/static/native_host.js"></script><script src="/static/form_center.js"></script></body></html>

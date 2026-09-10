@@ -1,0 +1,14 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>设备巡检表</title></head><body>
+<form><fieldset><legend>检查信息</legend>
+<label for="partNo">设备编号</label><input id="partNo" name="partNo" value="EQ-001" required>
+<label for="temperature">温度</label><input id="temperature" type="number" value="23.5">
+<label for="date">检查日期</label><input id="date" type="date" value="2026-09-08">
+<label for="result">检查结果</label><select id="result"><option value="ok">合格</option><option value="repair">待维修</option></select>
+<label for="photo">现场照片</label><input id="photo" type="file" accept="image/*">
+<label for="note">说明</label><textarea id="note">例行巡检</textarea>
+<label><input id="confirmed" type="checkbox" checked>已复核</label>
+</fieldset><table id="checks"><caption>巡检明细</caption><thead><tr><th>检查项目</th><th>结论</th></tr></thead><tbody>
+<tr><td><input value="油位"></td><td><input value="正常"></td></tr>
+<tr><td><input value="温控"></td><td><input value="正常"></td></tr></tbody></table></form>
+<script>document.body.dataset.untrustedScript = 'must-not-run';</script>
+</body></html>

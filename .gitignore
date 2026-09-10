@@ -21,6 +21,11 @@ template_previews/
 templates/DFM_Master_exact_v1.pptx
 templates/DFM_Demo_ExactStyle_v1.pptx
 
+# ---- PyInstaller 打包产物 ----
+packaging/build_dist/
+packaging/build_work/
+release/
+
 # ---- 日志 ----
 *.log
 

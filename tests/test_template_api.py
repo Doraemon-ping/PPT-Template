@@ -149,6 +149,31 @@ class TemplateAPITests(unittest.TestCase):
             })
         self.assertEqual(200, response.status_code, response.text)
 
+    def test_live_preview_reuses_process_cache_for_identical_request(self):
+        calls = []
+
+        def fake_render(pptx_path, slide_index, cache_root):
+            calls.append((Path(pptx_path), slide_index))
+            target = Path(cache_root) / "preview.png"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b"cached-preview-png")
+            return target
+
+        payload = {
+            "template": "demo",
+            "slide": {"source": 1},
+            "data": {"f": {"cache_marker": "unique-live-preview-cache-test"}},
+        }
+        with patch("app.report.ppt.slide_preview.render_slide_preview", side_effect=fake_render):
+            first = self.client.post("/api/template/live-preview", json=payload)
+            second = self.client.post("/api/template/live-preview", json=payload)
+        self.assertEqual(200, first.status_code, first.text)
+        self.assertEqual(200, second.status_code, second.text)
+        self.assertEqual(1, len(calls))
+        self.assertEqual("miss", first.headers["x-dfm-preview-cache"])
+        self.assertEqual("hit", second.headers["x-dfm-preview-cache"])
+        self.assertEqual(b"cached-preview-png", second.content)
+
     def test_live_preview_unknown_template_returns_404(self):
         response = self.client.post("/api/template/live-preview", json={"template": "nope", "slide": {"source": 1}})
         self.assertEqual(404, response.status_code)

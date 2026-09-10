@@ -1,12 +1,24 @@
 # PPT 模板生成器开发交接文档
 
-> 状态日期：2026-09-02  
+> 原始交接日期：2026-09-02；当前实现更新：2026-09-09。完整时间线见 [项目更新记录](CHANGELOG.md)。
 > 目标读者：接手开发 PPT 模板编辑器/模板生成器的工程师或 Agent  
-> 结论：FastAPI、DFM 计算、HTML 表单数据和现有 PPT 生成均可运行；下一步应开发“PowerPoint 模板绑定编辑器”，不应继续为 84 页正式模板手写页面坐标。
+> 当前结论：FastAPI、DFM 计算、HTML 表单数据、原样 HTML 桥接和通用 PPT 模板工作台均可运行；
+> 不应继续为 84 页正式模板手写页面坐标，应使用“导入 PPT → 选择模板目标 → 选择表单源字段 → 保存方案 → 生成”的链路。
+
+## 当前已交付基线（2026-09-09）
+
+- `/forms` 提供多表单应用、命名数据项目、版本历史和按应用隔离的模板/方案空间。
+- 普通 HTML 支持字段识别和确认；指定 DFM/报价 HTML 支持“原样运行 HTML + 数据桥接”，字段目录保留源路径（如 `G.cust`）。
+- `/template-editor` 支持导入任意 `.pptx`，按真实页面几何选择文本、图片、表格单元格和占位符目标；
+  `/api/template/scan` 同时返回 `placeholder_paths` 与 `binding_targets`。
+- 方案保存显式的 `PPT 目标 → 表单源` 关系。旧 DFM 路径仅在历史方案明确引用时迁移解析，新表单不会自动套用 `custName`、`partNo` 等别名。
+- 原样 HTML 生成前执行最终 OOXML 未绑定占位符检查；图片缺失按保留原模板对象处理，必需文本和损坏图片仍报错。
+- 实时预览使用隐藏 PowerPoint worker、450ms 输入防抖和短期 LRU 缓存；默认导出 1280×720，响应头 `X-DFM-Preview-Cache` 可观察命中状态。Worker 返回失效句柄时会销毁、重建并重试，之后才降级为一次性导出重试。
+- 当前回归：Python 224 项、Node 12 项通过；本机服务为 `127.0.0.1:8000`。
 
 ## 1. 产品目标
 
-项目需要把任意正式 PowerPoint 模板配置为可复用的 DFM 报告生成器：
+项目需要把任意正式 PowerPoint 模板配置为可复用的报告生成器（DFM 只是内置应用之一）：
 
 1. 用户打开或导入 PPT 模板。
 2. 编辑器载入 Excel 或现有 FastAPI 提供的结构化数据字段。
@@ -20,9 +32,9 @@
 ```text
 HTML / Excel / API 数据
         ↓
-Canonical Report JSON
+Form App Schema + Runtime Data
         ↓
-Template Binding Manifest
+Template Targets → Source Bindings
         ↓
 Slide Planning / Repeat / Conditions
         ↓
@@ -336,7 +348,9 @@ GET /api/template-editor/field-catalog
 3. `compute_all()` 派生结果。
 4. Excel Import Schema。
 
-长期应逐步把 2、3、4 收敛到 Canonical Report JSON，而不是让 Manifest 永久绑定 `f.xxx`。
+长期应逐步把 2、3、4 收敛到表单应用 Schema + Runtime Data，而不是让 Manifest 永久绑定固定的
+`f.xxx`。当前工作台已经按当前应用目录保存显式的“PPT 目标 → 表单源”关系；旧 DFM 路径只为
+历史方案提供限定迁移。
 
 ## 7. Excel 导入约定
 
@@ -353,14 +367,15 @@ History       # DFM 履历
 Tables_*      # 其他业务数组
 ```
 
-新增建议接口：
+原始设计阶段建议的接口（当前尚未实现为独立 Excel API）：
 
 ```http
 POST /api/template-editor/import-excel
 POST /api/template-editor/validate-data
 ```
 
-推荐使用现有 Python 环境中的 `openpyxl`（需要加入依赖），输出统一 JSON 和导入警告：
+当前优先使用 `/forms` 导入 HTML 并生成应用字段目录；若后续增加 Excel 导入，推荐使用现有
+Python 环境中的 `openpyxl`（需要加入依赖），输出统一 JSON 和导入警告：
 
 ```json
 {
@@ -541,16 +556,14 @@ app/report/ppt/openxml/
 - 未绑定对象不发生任何 OOXML 变化。
 - 模板中的 OLE、图片、母版和 Relationship 保持存在。
 
-完成该闭环后，再依次实现：
+原始路线中的图片绑定、表格单元格/整表绑定、Repeat、条件页面、模板注册和方案版本管理已在
+当前代码中交付。Excel 直接导入仍是后续增强项；现阶段可先通过表单中心的 HTML Schema 或
+FastAPI 结构化数据进入工作台。
 
-1. 图片绑定。
-2. 表格单元格绑定。
-3. Repeat Issue Slide。
-4. 条件页面。
-5. Excel 导入。
-6. 模板包和版本管理。
+## 12. 原始建议 API 与当前替代接口
 
-## 12. 建议 API
+以下接口保留用于追溯最初设计，当前实现以 README 和[多表单应用平台交接](FORM_PLATFORM_2026-09-09.md)
+列出的接口为准：
 
 ```text
 GET  /api/template-editor/field-catalog
@@ -566,7 +579,9 @@ GET  /api/templates/{template_id}/versions
 POST /api/templates/{template_id}/generate
 ```
 
-不要立即修改现有 `/api/ppt`。新模板生成器应先使用独立预览接口，经过真实模板回归后再切流。
+当前对应关系为：`/api/template/scan`、`/api/template/inspect`、`/api/template/live-preview`、
+`/api/template/generate`、`/api/templates/*` 和 `/api/schemes/*`；旧 `/api/ppt` 仍保留作为
+DFM 生产链路，不与通用模板工作台互相覆盖。
 
 ## 13. 测试与质量门禁
 
@@ -576,7 +591,9 @@ POST /api/templates/{template_id}/generate
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
-最近一次结果：79 项测试通过，4 项 HTTP 集成测试因当前 bundled runtime 缺少 FastAPI/httpx 而跳过。
+本文原始设计阶段的最近一次结果为 79 项通过、4 项 HTTP 集成测试因 bundled runtime 缺少
+FastAPI/httpx 而跳过；该数字仅作历史快照。当前基线为 Python 224 项、Node 12 项通过，
+详见本文件顶部“当前已交付基线”和 [项目更新记录](CHANGELOG.md)。
 
 模板编辑器新增测试至少包括：
 

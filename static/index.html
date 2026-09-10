@@ -219,6 +219,7 @@ table.ro td.hi{color:var(--rv);font-weight:700;font-family:Consolas,monospace}
   <div class="tb-actions">
     <a class="btn" href="/template-editor" title="导入 .pptx 模板 → 绑定字段 → 保存方案">🧰 模板工作台</a>
     <button class="btn" id="btnSchemeGen" title="用已保存的模板方案（模板+绑定关系）+ 当前表单数据直接生成">📋 按方案生成</button>
+    <a class="btn" href="/forms">表单中心</a>
     <button class="btn" id="btnSave">💾 保存项目</button>
     <button class="btn" id="btnLoadProject">📂 载入项目</button>
     <button class="btn" id="btnExport">⬇ 导出 JSON</button>
@@ -719,6 +720,8 @@ var MACHINES = [
 ];
 var S = {f:{}, t:{}, i:{}};
 var LS_KEY = 'hpdc_dfm_project_a12';
+var namedProjectId=new URLSearchParams(location.search).get('project_id');
+if(namedProjectId)LS_KEY+=':'+namedProjectId;
 
 /* 用 Schema 默认值初始化状态 */
 function initState(){
@@ -1065,25 +1068,10 @@ async function loadDemo(){
   }catch(e){ toast('载入示例失败：'+e.message); }
 }
 async function saveProject(){
-  try{
-    var res = await postJSON('/api/project/save', {f:S.f, t:S.t, i:S.i});
-    if(!res.ok){ throw new Error(await errMsg(res)); }
-    var data = await res.json();
-    toast(data.ok ? '已保存到服务器' : '保存失败');
-  }catch(e){ toast('保存失败：'+e.message); }
+  window.NamedProjects.showSave();
 }
 async function loadProject(){
-  try{
-    var res = await fetch('/api/project/load');
-    if(!res.ok){ throw new Error(await errMsg(res)); }
-    var data = await res.json();
-    var has = data && (Object.keys(data.f||{}).length || Object.keys(data.t||{}).length || Object.keys(data.i||{}).length);
-    if(!has){ toast('服务器暂无已保存的项目'); return; }
-    if(!confirm('载入服务器项目将覆盖当前内容，是否继续？')) return;
-    mergeState(data);
-    renderMain(); refreshAll(true); save();
-    toast('已载入服务器项目');
-  }catch(e){ toast('载入失败：'+e.message); }
+  location.href='/forms?app_id=dfm';
 }
 
 /* =========================================================================
@@ -1238,5 +1226,6 @@ window.addEventListener('beforeunload', function(){
 
 boot();
 </script>
+<script src="/static/named_projects.js"></script>
 </body>
 </html>

@@ -62,8 +62,9 @@ class TemplateRecord:
 class TemplateRegistry:
     """Resolve template ids to files; persists uploaded templates on disk."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, include_builtins=True) -> None:
         self.root = Path(root)
+        self.include_builtins = include_builtins
         self.storage = self.root / UPLOADED_DIR / TEMPLATES_SUBDIR
         self.registry_file = self.storage / REGISTRY_FILE
         self._uploaded: Dict[str, TemplateRecord] = {}
@@ -72,7 +73,7 @@ class TemplateRegistry:
     # ------------------------------------------------------------------ list
     def list(self) -> List[TemplateRecord]:
         records = []
-        for template_id, relative in _BUILTIN_PATHS.items():
+        for template_id, relative in (_BUILTIN_PATHS.items() if self.include_builtins else []):
             records.append(TemplateRecord(
                 template_id=template_id,
                 path=self.root / relative,
@@ -102,6 +103,11 @@ class TemplateRegistry:
         version: str = "1",
     ) -> TemplateRecord:
         template_id = self._normalize_id(template_id)
+        if template_id in self._uploaded:
+            base, index = template_id[:55], 2
+            while template_id in self._uploaded:
+                template_id = f'{base}-{index}'
+                index += 1
         if template_id in _BUILTIN_PATHS:
             raise TemplateRegistryError(f"template id conflicts with built-in template: {template_id}")
         if not data:
@@ -141,6 +147,8 @@ class TemplateRegistry:
     def _normalize_id(self, template_id: str) -> str:
         value = str(template_id or "").strip().casefold()
         value = re.sub(r"[^A-Za-z0-9_-]", "-", value)
+        if not value.strip('-_'):
+            value = 'template-' + hashlib.sha256(str(template_id).encode()).hexdigest()[:10]
         if not _SLIDE_ID_RE.match(value):
             raise TemplateRegistryError(f"invalid template id: {template_id!r}")
         return value

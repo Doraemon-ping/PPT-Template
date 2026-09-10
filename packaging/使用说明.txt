@@ -1,0 +1,44 @@
+HPDC DFM 报告自动生成工具 —— Windows x64 独立版使用说明
+========================================================
+
+一、如何启动
+  1. 双击 HPDC_DFM_Generator.exe（黑色控制台窗口会显示日志，属正常现象）。
+  2. 等待约 2~5 秒，浏览器会自动打开工具页面（默认地址 http://127.0.0.1:8000）。
+  3. 若 8000 端口被占用，程序会自动改用 8001/8002… 并打开对应地址；
+     也可手动指定端口：先按住 Shift+右键 → 在此处打开 PowerShell，执行：
+       $env:DFM_PORT=9000; .\HPDC_DFM_Generator.exe
+  4. 关闭方式：直接关闭黑色控制台窗口；或在该窗口按 Ctrl+C。
+
+二、目录说明（请勿删除）
+  HPDC_DFM_Generator.exe   主程序
+  _internal\               程序运行所需文件（不要改动）
+  templates\               内置演示模板（demo / pilot / table-demo 等）
+  data\                    你的数据（已随包附带）：
+                             - data\project.json      表单里保存的项目
+                             - data\schemes\          你保存的“绑定方案”
+                             - data\templates\        上传到“模板工作台”的模板
+                             - data\server.log        运行日志（出问题时可查看）
+  1-基础数据\              官方 84 页模板（已随包附带），
+                            模板清单中即可选“official”使用；
+                            不需要的话可整文件夹删除。
+
+三、注意事项
+  · 整个文件夹可以拷贝到任何 Windows 64 位电脑上直接运行，无需安装 Python。
+  · 备份/迁移：把整个文件夹拷走即可，你的方案和数据都在 data\ 里。
+  · “生成/预览”依赖本机安装的 Microsoft PowerPoint 时（真实预览功能）。首次预览会启动
+    隐藏的 PowerPoint 渲染进程，后续预览复用该进程以减少等待；未安装 PowerPoint 的电脑
+    会自动回退/跳过真实预览，不影响报告文件生成。
+  · 软件仅供内部使用，数据仅保存在本机，不会上传网络。
+
+四、预览故障排查
+  · 预览 PNG 依赖“运行服务的那台 Windows 机器”安装桌面版 Microsoft PowerPoint；
+    Python、python-pptx 和打包 exe 本身不能替代 PowerPoint 的真实页面渲染。
+  · 在发布目录执行：
+      powershell -ExecutionPolicy Bypass -File .\_internal\tools\check_preview_environment.ps1 -Root .\_internal
+    脚本会检查 PowerShell、两个预览脚本、当前服务账户和 PowerPoint COM 是否可用。
+  · 若 `powerpoint.available=false`，安装桌面版 PowerPoint 并用运行服务的同一账户启动一次；
+    若脚本都存在但仍返回句柄无效，先关闭残留 POWERPNT.EXE，再重启生成器服务。
+  · 重新发布代码后必须重新执行 PyInstaller 构建并替换整个 onedir 目录，不能只替换 exe；
+    然后重启服务。PPT 文件生成本身不依赖 Office，只有原页/数据实时 PNG 预览依赖它。
+  · 发给目标电脑时，请使用 release\DFM报告生成器_win64\ 或同名 .zip；
+    packaging\build_dist\ 是 PyInstaller 的中间产物，不含模板和运行期数据，不能直接分发。
