@@ -1,6 +1,8 @@
 'use strict';
 /* Workflow helpers layered on the existing workbench; saved deck schemas stay compatible. */
 var UX=EditorModels;
+/* 局域网 http 访问属非安全上下文，crypto.randomUUID 不存在；统一走带回退的生成器 */
+var dfmUuid=window.dfmUuid||function(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);});};
 var formulaExtraFields={
   'ppt.force.pressure':'铸造压力（公式显示）','ppt.force.area_part':'产品投影面积（公式显示）',
   'ppt.force.area_slider':'滑块投影面积（公式显示）','ppt.force.area_runner':'流道投影面积（公式显示）',
@@ -11,7 +13,7 @@ var formulaExtraFields={
   'ppt.force.clamp_required':'所需锁模力'
 };
 function bindingDraftKey(info){
-  var page=currentPage();if(!page._editorId)page._editorId=crypto.randomUUID();
+  var page=currentPage();if(!page._editorId)page._editorId=dfmUuid();
   return page._editorId+':'+info.key;
 }
 function rememberBindingDraft(){

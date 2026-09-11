@@ -1,6 +1,8 @@
 'use strict';
 window.NamedProjects=(function(){
   let current=null, saving=false;const qs=new URLSearchParams(location.search);
+  /* 局域网 http 访问属非安全上下文，crypto.randomUUID 不存在；统一走带回退的生成器 */
+  const dfmUuid=window.dfmUuid||(()=>'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);}));
   function updateLinks(){document.querySelectorAll('a[href^="/template-editor"]').forEach(a=>a.href='/template-editor?app_id=dfm'+(current?'&project_id='+encodeURIComponent(current.id):''));}
   const dialog=document.createElement('dialog');dialog.style.cssText='border:1px solid #dde2e8;border-radius:12px;width:min(540px,94vw);padding:24px';
   dialog.innerHTML='<h2>保存数据项目</h2><p>每个项目独立保存，更新会保留历史版本。</p><label>项目名称<input id="namedProjectName" style="width:100%;margin:8px 0 18px" maxlength="160"></label><p id="namedProjectStatus" role="status"></p><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn pri" id="namedSave">保存</button><button class="btn" id="namedCopy">另存为新项目</button><button class="btn" id="namedClose">取消</button></div>';
@@ -20,7 +22,7 @@ window.NamedProjects=(function(){
     }catch(e){document.querySelector('#namedProjectStatus').textContent=e.message;}finally{saving=false;}
   }
   document.querySelector('#namedSave').onclick=()=>persist(false);document.querySelector('#namedCopy').onclick=()=>persist(true);document.querySelector('#namedClose').onclick=()=>dialog.close();
-  async function init(){try{if(qs.get('project_id')){current=await request('/api/form-apps/dfm/projects/'+qs.get('project_id'));mergeState(current.data);renderMain();refreshAll(true);save();toast('已载入「'+current.name+'」· 版本 '+current.revision);}else if(qs.has('new_project')){S.f={};S.t={};S.i={};initState();LS_KEY='hpdc_dfm_new_'+crypto.randomUUID();renderMain();refreshAll(true);} }catch(e){toast('项目载入失败：'+e.message);}}
+  async function init(){try{if(qs.get('project_id')){current=await request('/api/form-apps/dfm/projects/'+qs.get('project_id'));mergeState(current.data);renderMain();refreshAll(true);save();toast('已载入「'+current.name+'」· 版本 '+current.revision);}else if(qs.has('new_project')){S.f={};S.t={};S.i={};initState();LS_KEY='hpdc_dfm_new_'+dfmUuid();renderMain();refreshAll(true);} }catch(e){toast('项目载入失败：'+e.message);}}
   init().then(updateLinks);
   return {showSave(){document.querySelector('#namedProjectName').value=current?.name||S.f.projName||S.f.partNo||'DFM 项目';document.querySelector('#namedProjectStatus').textContent=current?'将更新当前项目并创建新版本':'将创建新项目';document.querySelector('#namedCopy').hidden=!current;dialog.showModal();}};
 })();

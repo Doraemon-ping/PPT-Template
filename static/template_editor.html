@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script src="/static/uuid.js"></script>
 <title>DFM 模板可视化绑定 · 通用 PPT 模板工作台</title>
 <style>
 :root{--accent:#ff6a00;--accent2:#d95f00;--line:#e3e8ef;--line2:#d3dae4;--txt:#1f2328;--muted:#6b7684;--bg:#f4f6f9;--panel:#fff;--ok:#128a3c;--bad:#c62828;--r:8px}
@@ -396,7 +397,7 @@ async function switchTemplatePreview(tid){
 /* 把存储页（后端 deck 结构）规范为编辑器页结构 */
 function normalizeDeckPage(d){
   var page={source:parseInt(d.source,10)||1,template:d.template||state.template,
-    repeat:d.repeat||'',condition:d.condition||'',bindings:{},images:EditorModels.copy(d.images||{}),_editorId:crypto.randomUUID()};
+    repeat:d.repeat||'',condition:d.condition||'',bindings:{},images:EditorModels.copy(d.images||{}),_editorId:dfmUuid()};
   var bd=d.bindings||{};
   Object.keys(bd).forEach(function(k){var b=bd[k];if(!b)return;
     var spec={type:b.type||'text',source:b.source,shape:b.shape||k,required:(b.required!==false)};

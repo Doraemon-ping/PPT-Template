@@ -1,11 +1,13 @@
 /* Original HTML is never inserted into the host DOM as executable markup. */
 window.NativeFormHost=(function(){
   let frame=null, channel=null, pending=new Map(), mounted=false, originalSource='';
+  /* 局域网 http 访问属非安全上下文，crypto.randomUUID 不存在；统一走带回退的生成器 */
+  const dfmUuid=window.dfmUuid||(()=>'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);}));
   function dispose(){mounted=false;for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error('表单已切换'));}pending.clear();frame?.remove();frame=null;channel=null;}
   function request(type,runtime){
     if(!frame||!mounted)return Promise.reject(new Error('原样表单尚未就绪，请等待页面加载'));
     return new Promise((resolve,reject)=>{
-      const id=crypto.randomUUID(),timer=setTimeout(()=>{pending.delete(id);reject(new Error('读取原表单超时，未保存数据，请重试'));},15000);
+      const id=dfmUuid(),timer=setTimeout(()=>{pending.delete(id);reject(new Error('读取原表单超时，未保存数据，请重试'));},15000);
       pending.set(id,{resolve,reject,timer});frame.contentWindow.postMessage({channel,id,type,runtime},'*');
     });
   }
@@ -14,7 +16,7 @@ window.NativeFormHost=(function(){
     const [response,scriptResponse]=await Promise.all([fetch('/api/form-apps/'+encodeURIComponent(appId)+'/runtime-source'),fetch('/static/native_bridge.js')]);
     if(!response.ok||!scriptResponse.ok)throw new Error('无法读取原 HTML 或数据桥接脚本');
     const source=await response.json(),bridge=await scriptResponse.text();originalSource=source.html;
-    channel=crypto.randomUUID();
+    channel=dfmUuid();
     const doc=new DOMParser().parseFromString(source.html,'text/html');
     doc.querySelectorAll('base,meta[http-equiv],iframe,object,embed,script[src],link').forEach(n=>n.remove());
     const policy=doc.createElement('meta');policy.httpEquiv='Content-Security-Policy';
