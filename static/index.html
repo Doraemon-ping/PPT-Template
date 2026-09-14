@@ -751,7 +751,7 @@ function renderNav(){
     });
     h += '</div></div>';
   });
-  h += '<div class="nav-foot">计算 / PPT 由 FastAPI 后端完成<br>数据自动保存于本机浏览器<br>（localStorage），可保存至服务器</div>';
+  h += '<div class="nav-foot">计算 / PPT 由 FastAPI 后端完成<br>数据自动保存于本机浏览器<br>（localStorage），可保存至服务器<br><a href="/api/logs/tail?lines=300" target="_blank" rel="noopener">服务器日志</a></div>';
   $('#nav').innerHTML = h;
 
   $$('#nav .nh').forEach(function(el){
@@ -1008,8 +1008,14 @@ function postJSON(url, body){
   });
 }
 async function errMsg(res){
+  var text = '';
+  try{ text = await res.text(); }catch(_){}
+  var rid = '';
+  try{ rid = res.headers.get('X-Request-Id') || ''; }catch(_){}
+  console.error('[DFM] 接口错误', res.url || '', res.status, rid, text);
+  if(typeof dfmReadError === 'function'){ return dfmReadError(res.status, text, rid); }
   var msg = '请求失败 ('+res.status+')';
-  try{ var e = await res.json(); if(e && e.detail) msg = e.detail; }catch(_){}
+  try{ var e = JSON.parse(text); if(e && e.detail) msg = e.detail; }catch(_){}
   return msg;
 }
 function applyValues(map){
@@ -1227,6 +1233,7 @@ window.addEventListener('beforeunload', function(){
 boot();
 </script>
 <script src="/static/uuid.js"></script>
+<script src="/static/api_error.js"></script>
 <script src="/static/named_projects.js"></script>
 </body>
 </html>

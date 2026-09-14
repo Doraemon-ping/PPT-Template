@@ -14,7 +14,17 @@ window.NativeFormHost=(function(){
   async function mount(container,appId,runtime,onDirty){
     dispose();
     const [response,scriptResponse]=await Promise.all([fetch('/api/form-apps/'+encodeURIComponent(appId)+'/runtime-source'),fetch('/static/native_bridge.js')]);
-    if(!response.ok||!scriptResponse.ok)throw new Error('无法读取原 HTML 或数据桥接脚本');
+    if(!response.ok||!scriptResponse.ok){
+      let detail='';
+      try{
+        if(!response.ok){
+          const text=await response.text();
+          const rid=response.headers.get('X-Request-Id')||'';
+          detail=typeof window.dfmReadError==='function'?window.dfmReadError(response.status,text,rid):text;
+        }
+      }catch(_){ }
+      throw new Error('无法读取原 HTML 或数据桥接脚本'+(detail?('：'+detail):''));
+    }
     const source=await response.json(),bridge=await scriptResponse.text();originalSource=source.html;
     channel=dfmUuid();
     const doc=new DOMParser().parseFromString(source.html,'text/html');

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="/static/uuid.js"></script>
+<script src="/static/api_error.js"></script>
 <title>DFM 模板可视化绑定 · 通用 PPT 模板工作台</title>
 <style>
 :root{--accent:#ff6a00;--accent2:#d95f00;--line:#e3e8ef;--line2:#d3dae4;--txt:#1f2328;--muted:#6b7684;--bg:#f4f6f9;--panel:#fff;--ok:#128a3c;--bad:#c62828;--r:8px}
@@ -299,7 +300,7 @@ function $$(s){return Array.prototype.slice.call(document.querySelectorAll(s));}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function toast(m){var t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(function(){t.style.display='none';},2800);}
 function mask(on){$('#mask').classList[on?'add':'remove']('on');}
-async function api(path,opts){opts=Object.assign({cache:'no-store'},opts||{});var r=await fetch(scopedUrl(path),opts);if(!r.ok){var m='请求失败 ('+r.status+')';try{var e=await r.json();if(e.detail)m=e.detail;}catch(_){ }throw new Error(m);}return r;}
+async function api(path,opts){opts=Object.assign({cache:'no-store'},opts||{});var r=await fetch(scopedUrl(path),opts);if(!r.ok){var text='';try{text=await r.text();}catch(_){ }var rid='';try{rid=r.headers.get('X-Request-Id')||'';}catch(_){ }console.error('[DFM] 接口错误',path,r.status,rid,text);throw new Error(typeof dfmReadError==='function'?dfmReadError(r.status,text,rid):('请求失败 ('+r.status+')'));}return r;}
 
 /* ---------------- 模板 / 数据加载 ---------------- */
 async function refreshTemplates(){
@@ -540,8 +541,10 @@ function loadCanvasPreview(canvas, cp, source){
       var res=await fetch(scopedUrl('/api/template/live-preview'),{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify(payload),signal:controller.signal});
       if(!res.ok){
-        var err=await res.json().catch(function(){return {};});
-        throw new Error(typeof err.detail==='string'?err.detail:'HTTP '+res.status);
+        var text='';try{text=await res.text();}catch(_){ }
+        var rid='';try{rid=res.headers.get('X-Request-Id')||'';}catch(_){ }
+        console.error('[DFM] 实时预览失败',res.status,rid,text);
+        throw new Error(typeof dfmReadError==='function'?dfmReadError(res.status,text,rid):('HTTP '+res.status));
       }
       var blob=await res.blob();
       if(canvas._previewToken!==token)return;

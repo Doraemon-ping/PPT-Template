@@ -5,12 +5,11 @@ app/main.py 的 ``if __name__ == "__main__": run()`` 分支只在直接以模块
 触发；冻结成 exe 后入口是本文件，负责：
   1) 探测空闲端口（默认 8000，被占用则顺延），避免与其它程序冲突；
   2) 短暂延时后自动打开浏览器；
-  3) 把服务日志同时写入 exe 旁 data/server.log，便于排查；
+  3) 把服务日志同时写入 exe 旁 data/logs/server.log（滚动），便于事后排查；
   4) 以进程内方式启动 uvicorn（不能 reload / 不能按字符串导入）。
 
 开发模式下无需使用本文件，直接 ``uvicorn app.main:app --reload`` 即可。
 """
-import logging
 import os
 import socket
 import sys
@@ -48,20 +47,6 @@ def _open_browser(url: str, delay: float = 1.4) -> None:
     timer.start()
 
 
-def _setup_file_log(data_dir: Path) -> None:
-    try:
-        data_dir.mkdir(parents=True, exist_ok=True)
-        handler = logging.FileHandler(data_dir / "server.log", encoding="utf-8")
-        handler.setFormatter(
-            logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
-        )
-        for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
-            logger = logging.getLogger(name)
-            logger.addHandler(handler)
-    except Exception:  # noqa: BLE001
-        pass
-
-
 def _lan_ips():
     """收集本机非回环 IPv4 地址，用于提示局域网访问地址。"""
     ips = set()
@@ -97,9 +82,11 @@ def main() -> None:
 
     import uvicorn
 
-    from app.main import DATA_DIR
+    from app.logging_setup import configure_logging, uvicorn_log_config
+    from app.main import APP_ROOT
 
-    _setup_file_log(DATA_DIR)
+    # 应用侧日志（控制台 + data/logs/server.log）
+    log_path = configure_logging(APP_ROOT, os.environ.get("DFM_LOG_LEVEL", "INFO").upper())
 
     app_obj = app.main.app
     # 默认监听 0.0.0.0（本机 + 局域网均可访问）；如需只限本机，设环境变量 DFM_HOST=127.0.0.1
@@ -108,6 +95,7 @@ def main() -> None:
     local_url = f"http://127.0.0.1:{port}"
     print(f"[DFM] 服务启动中")
     print(f"[DFM] 本机访问:   {local_url}")
+    print(f"[DFM] 日志文件:   {log_path}")
     if host != "127.0.0.1":
         for ip in _lan_ips():
             print(f"[DFM] 局域网访问: http://{ip}:{port}   (同一网络的其他电脑浏览器打开)")
@@ -119,6 +107,8 @@ def main() -> None:
         host=host,
         port=port,
         log_level=os.environ.get("DFM_LOG_LEVEL", "info"),
+        # 用自定义 log_config，避免 uvicorn 自带 dictConfig 覆盖文件日志
+        log_config=uvicorn_log_config(APP_ROOT, os.environ.get("DFM_LOG_LEVEL", "info")),
     )
     server = uvicorn.Server(config)
     try:

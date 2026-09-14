@@ -20,23 +20,26 @@
 """
 import json
 import hashlib
+import logging
 import os
 import re
 import sys
 import threading
 import time
+import uuid
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote
 
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .calc import compute_all
 from .demo import demo_state
+from .logging_setup import configure_logging, tail_lines
 from .ppt import build_pptx, safe_filename
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -51,6 +54,10 @@ PROJECT_FILE = DATA_DIR / "project.json"
 PPT_V2_TEMPLATE_PATH = BASE_DIR / "templates" / "DFM_Master_v1.pptx"
 PPT_V2_SCHEMA_DIR = BASE_DIR / "app" / "report" / "ppt" / "schemas"
 PPT_V2_TEMPLATE_VERSION = "1"
+
+# 日志：控制台 + data/logs/server.log（滚动），开发模式与打包 exe 都落盘
+LOG_FILE = configure_logging(APP_ROOT)
+LOGGER = logging.getLogger("dfm.app")
 
 # 内置模板（registry 里 origin=builtin）；用户上传模板存于 data/templates/
 BUILTIN_TEMPLATE_IDS = ("official", "exact", "pilot", "demo", "table-demo")
@@ -152,10 +159,68 @@ async def form_application_scope(request, call_next):
     finally:
         FORM_SCOPE.reset(token)
 
+@app.middleware('http')
+async def log_requests(request: Request, call_next):
+    """为每个请求分配请求号并记录耗时；未处理异常返回带请求号的 JSON 且写日志。"""
+    request_id = uuid.uuid4().hex[:12]
+    request.state.request_id = request_id
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception as exc:  # noqa: BLE001 - 兜底，避免只返回纯文本 500
+        elapsed = (time.perf_counter() - started) * 1000
+        LOGGER.exception('未处理异常 %s %s (%.0fms) [请求号 %s]',
+                         request.method, request.url.path, elapsed, request_id)
+        return JSONResponse(
+            status_code=500,
+            content={'detail': f'服务器内部错误：{exc}', 'request_id': request_id, 'log_file': str(LOG_FILE)},
+            headers={'X-Request-Id': request_id},
+        )
+    elapsed = (time.perf_counter() - started) * 1000
+    response.headers['X-Request-Id'] = request_id
+    path = request.url.path
+    status = response.status_code
+    if status >= 500:
+        LOGGER.error('%s %s -> %s (%.0fms) [请求号 %s]', request.method, path, status, elapsed, request_id)
+    elif status >= 400:
+        LOGGER.warning('%s %s -> %s (%.0fms) [请求号 %s]', request.method, path, status, elapsed, request_id)
+    elif path.startswith('/static') or path in ('/', '/forms', '/template-editor'):
+        LOGGER.debug('%s %s -> %s (%.0fms) [请求号 %s]', request.method, path, status, elapsed, request_id)
+    else:
+        LOGGER.info('%s %s -> %s (%.0fms) [请求号 %s]', request.method, path, status, elapsed, request_id)
+    return response
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """兜底异常处理：返回 JSON 详情（含请求号），而非纯文本 Internal Server Error。"""
+    request_id = getattr(request.state, 'request_id', None) or uuid.uuid4().hex[:12]
+    LOGGER.exception('未捕获异常 %s %s [请求号 %s]', request.method, request.url.path, request_id)
+    return JSONResponse(
+        status_code=500,
+        content={'detail': f'服务器内部错误：{exc}', 'request_id': request_id, 'log_file': str(LOG_FILE)},
+        headers={'X-Request-Id': request_id},
+    )
+
+
+@app.get('/api/logs/tail')
+def api_logs_tail(lines: int = 200):
+    """查看服务端最近日志（局域网访问时无需登录主机即可排查）。"""
+    count = max(1, min(int(lines or 200), 2000))
+    return {'file': str(LOG_FILE), 'lines': tail_lines(APP_ROOT, count)}
+
+
+@app.get('/api/logs/download')
+def api_logs_download():
+    """下载完整日志文件。"""
+    if not LOG_FILE.is_file():
+        raise HTTPException(404, '日志文件尚未生成')
+    return FileResponse(LOG_FILE, media_type='text/plain; charset=utf-8', filename='dfm-server.log')
+
+
 @app.get('/forms')
 def form_center():
     return FileResponse(STATIC_DIR / 'form_center.html')
-
 @app.post('/api/form-apps/dfm/import-legacy-project')
 def import_legacy_project():
     if not PROJECT_FILE.exists():

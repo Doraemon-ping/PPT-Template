@@ -10,7 +10,7 @@ const modeLabel=document.createElement('label');modeLabel.innerHTML='导入方�
 $('#newAppName').parentElement.after(modeLabel);
 function updateImportMode(){const native=$('#importMode').value==='native';$('#schemaEditor').hidden=native;$('#addField').hidden=native;$('#addTable').hidden=native;$('#modeHelp').textContent=native?'保留原页面和脚本，在隔离框架中运行。图片和明细随项目保存；PPT 参数在首次保存项目后生成。仅导入你信任的 HTML。':'仅提取字段，不保留原页面布局、计算和联动。';}
 $('#importMode').onchange=updateImportMode;
-async function api(path,options={}){const r=await fetch(path,{cache:'no-store',...options});if(!r.ok){let e=await r.json().catch(()=>({detail:'请求失败'}));throw new Error(typeof e.detail==='string'?e.detail:JSON.stringify(e.detail));}return r;}
+async function api(path,options={}){const r=await fetch(path,{cache:'no-store',...options});if(!r.ok){const text=await r.text().catch(()=> '');const rid=r.headers.get('X-Request-Id')||'';console.error('[DFM] 接口错误',path,r.status,rid,text);throw new Error(dfmReadError(r.status,text,rid));}return r;}
 const json=async(path,body,method='POST')=>(await api(path,{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
 const base=()=>'/api/form-apps/'+encodeURIComponent(appId);
 function message(text){$('#message').textContent=text;$('#message').hidden=false;clearTimeout(message.timer);message.timer=setTimeout(()=>$('#message').hidden=true,6500);}

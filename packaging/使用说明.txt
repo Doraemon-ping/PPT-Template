@@ -17,10 +17,15 @@ HPDC DFM 报告自动生成工具 —— Windows x64 独立版使用说明
                              - data\project.json      表单里保存的项目
                              - data\schemes\          你保存的“绑定方案”
                              - data\templates\        上传到“模板工作台”的模板
-                             - data\server.log        运行日志（出问题时可查看）
+                             - data\form_platform\    表单平台项目库（/forms 的载入项目列表）
+                             - data\logs\server.log   运行日志（滚动保留 5 份，出问题看这里）
+                             - data\logs\startup-error.log  启动失败时的错误详情
   1-基础数据\              官方 84 页模板（已随包附带），
                             模板清单中即可选“official”使用；
                             不需要的话可整文件夹删除。
+
+  排查问题：浏览器打开 http://<主机IP>:<端口>/api/logs/tail?lines=300
+            即可直接查看服务端最近日志；报错提示中的“请求号”可在日志里搜索定位。
 
 三、注意事项
   · 整个文件夹可以拷贝到任何 Windows 64 位电脑上直接运行，无需安装 Python。
