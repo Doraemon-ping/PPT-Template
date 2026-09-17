@@ -3,15 +3,7 @@
 var UX=EditorModels;
 /* 局域网 http 访问属非安全上下文，crypto.randomUUID 不存在；统一走带回退的生成器 */
 var dfmUuid=window.dfmUuid||function(){return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);});};
-var formulaExtraFields={
-  'ppt.force.pressure':'铸造压力（公式显示）','ppt.force.area_part':'产品投影面积（公式显示）',
-  'ppt.force.area_slider':'滑块投影面积（公式显示）','ppt.force.area_runner':'流道投影面积（公式显示）',
-  'ppt.force.area_overflow':'渣包投影面积（公式显示）','ppt.force.part':'产品胀型力',
-  'ppt.force.slider':'滑块胀型力','ppt.force.runner':'流道胀型力','ppt.force.overflow':'渣包胀型力',
-  'ppt.force.total':'总胀型力','ppt.force.slider_angle':'滑块夹角（公式显示）',
-  'ppt.force.slider_term':'滑块角度修正项','ppt.force.clamp_factor':'锁模安全系数（公式显示）',
-  'ppt.force.clamp_required':'所需锁模力'
-};
+
 function bindingDraftKey(info){
   var page=currentPage();if(!page._editorId)page._editorId=dfmUuid();
   return page._editorId+':'+info.key;
@@ -137,7 +129,6 @@ $('#pageList').addEventListener('click',function(e){var button=e.target.closest(
 function formulaEntries(){
   var entries=CAT.fields.map(function(f){return {path:f.path,label:f.label};});
   Object.keys(CAT.derived).forEach(function(k){entries.push({path:'derived.'+k,label:CAT.derived[k]});});
-  if(FORM_APP==='dfm')Object.keys(formulaExtraFields).forEach(function(path){entries.push({path:path,label:formulaExtraFields[path]});});
   return entries;
 }
 function initFormulaEditor(existing,draft){

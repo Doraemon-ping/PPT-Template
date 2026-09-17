@@ -81,7 +81,8 @@ def main() -> None:
     deck = DeckDefinition(
         template="product-analysis", output_mode="in_place", slides=[build_slide(args.template)]
     )
-    result = TemplateEngine(args.template).generate(deck, data)
+    from app.provider_context import build_legacy_context
+    result = TemplateEngine(args.template).generate(deck, build_legacy_context(data))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_bytes(result.buffer)
     print(json.dumps({"output": str(args.output), "slides": result.slide_count,

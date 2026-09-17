@@ -102,7 +102,7 @@ class TemplateAPITests(unittest.TestCase):
         self.assertEqual(1, len(Presentation(io.BytesIO(response.content)).slides))
 
     def test_live_preview_applies_data_and_does_not_modify_template(self):
-        from app.main import _registry
+        from app.services.workbench import _registry
         original_path = _registry().resolve("demo").path
         original = original_path.read_bytes()
         rendered_paths = []

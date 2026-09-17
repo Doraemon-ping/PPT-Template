@@ -24,5 +24,9 @@ window.NamedProjects=(function(){
   document.querySelector('#namedSave').onclick=()=>persist(false);document.querySelector('#namedCopy').onclick=()=>persist(true);document.querySelector('#namedClose').onclick=()=>dialog.close();
   async function init(){try{if(qs.get('project_id')){current=await request('/api/form-apps/dfm/projects/'+qs.get('project_id'));mergeState(current.data);renderMain();refreshAll(true);save();toast('已载入「'+current.name+'」· 版本 '+current.revision);}else if(qs.has('new_project')){S.f={};S.t={};S.i={};initState();LS_KEY='hpdc_dfm_new_'+dfmUuid();renderMain();refreshAll(true);} }catch(e){toast('项目载入失败：'+e.message);}}
   init().then(updateLinks);
-  return {showSave(){document.querySelector('#namedProjectName').value=current?.name||S.f.projName||S.f.partNo||'DFM 项目';document.querySelector('#namedProjectStatus').textContent=current?'将更新当前项目并创建新版本':'将创建新项目';document.querySelector('#namedCopy').hidden=!current;dialog.showModal();}};
+  return {async saveForWorkbench(){
+    if(saving)throw new Error('项目正在保存，请稍后进入工作台');
+    saving=true;
+    try{const id=current?.id;current=await request('/api/form-apps/dfm/projects'+(id?'/'+id:''),{method:id?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:current?.name||S.f.projName||S.f.partNo||'DFM 项目',revision:current?.revision,data:{f:S.f,t:S.t,i:S.i}})});updateLinks();return current.id;}finally{saving=false;}
+  },showSave(){document.querySelector('#namedProjectName').value=current?.name||S.f.projName||S.f.partNo||'DFM 项目';document.querySelector('#namedProjectStatus').textContent=current?'将更新当前项目并创建新版本':'将创建新项目';document.querySelector('#namedCopy').hidden=!current;dialog.showModal();}};
 })();

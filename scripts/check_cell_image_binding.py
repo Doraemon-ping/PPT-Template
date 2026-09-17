@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-from app.main import _registry
+from app.services.workbench import _registry
 from app.demo import demo_state
 from app.report.ppt.deck import DeckDefinition
 from app.report.ppt.template_engine import TemplateEngine

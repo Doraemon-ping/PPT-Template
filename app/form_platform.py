@@ -211,11 +211,16 @@ class PlatformStore:
         self.db = self.root / 'platform.sqlite3'
         with self.connect() as db:
             db.executescript('''
-                CREATE TABLE IF NOT EXISTS apps(id TEXT PRIMARY KEY,name TEXT NOT NULL,schema_json TEXT NOT NULL,warnings_json TEXT NOT NULL,html BLOB,created TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS apps(id TEXT PRIMARY KEY,name TEXT NOT NULL,schema_json TEXT NOT NULL,warnings_json TEXT NOT NULL,html BLOB,created TEXT NOT NULL,archived INTEGER NOT NULL DEFAULT 0);
                 CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY,app_id TEXT NOT NULL,name TEXT NOT NULL,revision INTEGER NOT NULL,data_json TEXT NOT NULL,updated TEXT NOT NULL,archived INTEGER NOT NULL DEFAULT 0);
                 CREATE TABLE IF NOT EXISTS revisions(project_id TEXT NOT NULL,revision INTEGER NOT NULL,name TEXT NOT NULL,data_json TEXT NOT NULL,created TEXT NOT NULL,PRIMARY KEY(project_id,revision));
                 CREATE TABLE IF NOT EXISTS drafts(app_id TEXT NOT NULL,draft_key TEXT NOT NULL,revision INTEGER NOT NULL,payload TEXT NOT NULL,PRIMARY KEY(app_id,draft_key));
             ''')
+            # Existing installations predate application-level soft deletion.
+            # ALTER keeps every imported source, project, template and scheme.
+            columns = {row['name'] for row in db.execute('PRAGMA table_info(apps)')}
+            if 'archived' not in columns:
+                db.execute('ALTER TABLE apps ADD COLUMN archived INTEGER NOT NULL DEFAULT 0')
 
     @contextmanager
     def connect(self):
@@ -227,12 +232,14 @@ class PlatformStore:
         finally:
             db.close()
 
-    def application(self, app_id):
+    def application(self, app_id, *, allow_archived=False):
         if app_id == 'dfm': return {'id': 'dfm', 'name': '高压压铸 DFM', 'builtin': True}
         with self.connect() as db:
-            r = db.execute('SELECT id,name,schema_json,warnings_json,created FROM apps WHERE id=?', (app_id,)).fetchone()
+            r = db.execute('SELECT id,name,schema_json,warnings_json,created,archived FROM apps WHERE id=?', (app_id,)).fetchone()
         if not r: raise HTTPException(404, '表单应用不存在')
-        return {'id': r['id'], 'name': r['name'], 'schema': json.loads(r['schema_json']), 'warnings': json.loads(r['warnings_json']), 'created': r['created'], 'builtin': False}
+        if r['archived'] and not allow_archived:
+            raise HTTPException(410, '表单应用已删除，可在表单中心的“已删除应用”中恢复')
+        return {'id': r['id'], 'name': r['name'], 'schema': json.loads(r['schema_json']), 'warnings': json.loads(r['warnings_json']), 'created': r['created'], 'archived': bool(r['archived']), 'builtin': False}
 
     def project(self, app_id, project_id, revision=None):
         with self.connect() as db:
@@ -265,11 +272,15 @@ class PlatformStore:
         application = self.application(app_id)
         if application.get('schema', {}).get('runtime'):
             from .native_forms import normalize
-            data, _ = normalize(data.get('runtime'), include_legacy_aliases=False)
+            # Validate and project once, but persist only the authoritative
+            # runtime snapshot.  Storing the generated f/t/i projection as
+            # well would duplicate large JSON exports in every revision.
+            normalized, _ = normalize(data.get('runtime'), include_legacy_aliases=False)
+            data = {'runtime': normalized['runtime']}
         if not name.strip(): raise HTTPException(422, '请输入项目名称')
         if any(not isinstance(data.get(k, {}), dict) for k in ('f','t','i')):
             raise HTTPException(422, '项目数据 f/t/i 必须为对象')
-        payload = json.dumps({k: data.get(k, {}) for k in (('f', 't', 'i', 'runtime') if application.get('schema', {}).get('runtime') else ('f', 't', 'i'))}, ensure_ascii=False, allow_nan=False)
+        payload = json.dumps({k: data.get(k, {}) for k in (('runtime',) if application.get('schema', {}).get('runtime') else ('f', 't', 'i'))}, ensure_ascii=False, allow_nan=False)
         if len(payload.encode()) > 80 * 1024 * 1024: raise HTTPException(413, '项目数据超过 80 MB')
         now = stamp()
         with self.connect() as db:
@@ -303,11 +314,11 @@ def router_for(get_store, static_dir):
     router = APIRouter()
 
     @router.get('/api/form-apps')
-    def list_apps():
+    def list_apps(archived: bool = False):
         store = get_store()
         with store.connect() as db:
-            items = [dict(r) for r in db.execute('SELECT id,name,created FROM apps ORDER BY created DESC')]
-        return {'apps': [store.application('dfm')] + items}
+            items = [dict(r) for r in db.execute('SELECT id,name,created,archived FROM apps WHERE archived=? ORDER BY created DESC', (int(archived),))]
+        return {'apps': ([] if archived else [store.application('dfm')]) + items}
 
     @router.post('/api/form-apps/discover')
     async def discover(file: UploadFile):
@@ -331,8 +342,11 @@ def router_for(get_store, static_dir):
         schema = {'fields': [], 'tables': [], 'runtime': {'adapter':info['adapter']}}
         key = uuid.uuid4().hex
         store = get_store()
+        warning = '原样运行模式：原脚本在隔离框架中运行，项目数据通过桥接保存。'
+        if info['adapter'] == 'json_export_v1':
+            warning = '通用 JSON 模式：完整导出数据作为事实源保存，字段目录会在项目保存后自动生成。'
         with store.connect() as db:
-            db.execute('INSERT INTO apps VALUES(?,?,?,?,?,?)', (key, (file.filename or info['name']).rsplit('.',1)[0][:100], json.dumps(schema), json.dumps(['原样运行模式：原脚本在隔离框架中运行，项目数据通过桥接保存。']), decode_source(raw), stamp()))
+            db.execute('INSERT INTO apps(id,name,schema_json,warnings_json,html,created,archived) VALUES(?,?,?,?,?,?,0)', (key, (file.filename or info['name']).rsplit('.',1)[0][:100], json.dumps(schema), json.dumps([warning], ensure_ascii=False), decode_source(raw), stamp()))
         return store.application(key)
 
     @router.get('/api/form-apps/{app_id}/runtime-source')
@@ -353,21 +367,31 @@ def router_for(get_store, static_dir):
         key = uuid.uuid4().hex
         store = get_store()
         with store.connect() as db:
-            db.execute('INSERT INTO apps VALUES(?,?,?,?,?,?)', (key, req.name.strip(), json.dumps(schema, ensure_ascii=False), json.dumps(req.warnings, ensure_ascii=False), None, stamp()))
+            db.execute('INSERT INTO apps(id,name,schema_json,warnings_json,html,created,archived) VALUES(?,?,?,?,?,?,0)', (key, req.name.strip(), json.dumps(schema, ensure_ascii=False), json.dumps(req.warnings, ensure_ascii=False), None, stamp()))
         return store.application(key)
 
     @router.get('/api/form-apps/{app_id}')
     def get_app(app_id: str):
         return get_store().application(app_id)
 
+    @router.post('/api/form-apps/{app_id}/archive')
+    def archive_app(app_id: str, archived: bool = True):
+        if app_id == 'dfm':
+            raise HTTPException(422, '内置 DFM 表单不能删除')
+        store = get_store()
+        store.application(app_id, allow_archived=True)
+        with store.connect() as db:
+            db.execute('UPDATE apps SET archived=? WHERE id=?', (int(archived), app_id))
+        return {'ok': True, 'archived': archived}
+
     @router.get('/api/form-apps/{app_id}/catalog')
     def get_catalog(app_id: str, project_id: str | None = None):
-        application = get_store().application(app_id)
+        store = get_store()
+        application = store.application(app_id)
         if app_id == 'dfm':
             source = (static_dir / 'dfm_catalog.js').read_text(encoding='utf-8')
             return json.loads(source[source.index('{'):source.rfind('}')+1])
         if application['schema'].get('runtime'):
-            store = get_store()
             if project_id:
                 snapshot = store.project(app_id, project_id)['data']
             else:
@@ -381,7 +405,8 @@ def router_for(get_store, static_dir):
 
     @router.get('/api/form-apps/{app_id}/defaults')
     def get_defaults(app_id: str):
-        application = get_store().application(app_id)
+        store = get_store()
+        application = store.application(app_id)
         if app_id == 'dfm':
             from .demo import demo_state
             return demo_state()

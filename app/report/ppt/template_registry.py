@@ -62,10 +62,10 @@ class TemplateRecord:
 class TemplateRegistry:
     """Resolve template ids to files; persists uploaded templates on disk."""
 
-    def __init__(self, root: Path, *, include_builtins=True) -> None:
+    def __init__(self, root: Path, *, include_builtins=True, storage_root=None) -> None:
         self.root = Path(root)
         self.include_builtins = include_builtins
-        self.storage = self.root / UPLOADED_DIR / TEMPLATES_SUBDIR
+        self.storage = Path(storage_root) if storage_root is not None else self.root / UPLOADED_DIR / TEMPLATES_SUBDIR
         self.registry_file = self.storage / REGISTRY_FILE
         self._uploaded: Dict[str, TemplateRecord] = {}
         self._load()

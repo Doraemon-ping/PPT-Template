@@ -1,10 +1,21 @@
 # 当前开发上下文（唯一有效入口）
 
-最后更新：2026-09-10  
+最后更新：2026-09-17
 项目：HPDC DFM 自动生成 / 多表单 PPT 模板工作台  
 工作目录：`C:\Users\26257\Desktop\工作计划\6-DFM自动生成`
 
 > 后续 Agent 先读本文，再看 `docs/CHANGELOG.md` 的增量记录。本文只描述当前有效架构和边界；按日期命名的旧交接文档均为历史参考，不应覆盖本文结论。
+
+## 当前架构优先说明（2026-09-17）
+
+已完成三服务拆分，完整边界、运行方式、存储迁移和 API 契约以 [SERVICE_ARCHITECTURE.md](SERVICE_ARCHITECTURE.md) 为准。下文描述的编辑交互仍适用，但单体路由/存储说明已被以下规则取代：
+
+- `app/main.py` 仅为单端口兼容网关；独立入口是 `app/services/hpdc.py`、`machining.py`、`workbench.py`。
+- PPT 不得导入 `form_platform`、`machining_dfm`、`calc` 等业务模块。旧引擎业务投影移至提供方 `app/provider_context.py`。
+- 工作台通过 `workbench_core.ProviderHub` 调用 `/api/ppt-provider/v1`，字段目录及计算值由表单 API 返回。
+- 项目数据库保留原目录；模板、方案和编辑草稿统一归工作台 `data/ppt_workbench/`，按 source_id 隔离。旧模板/方案/草稿只复制迁移，不删除原件。
+- 增加新项目：实现提供方接口并更新连接 JSON；不要再向工作台或压铸平台添加业务类型分支。
+- `run_services.py` 启动三个独立进程，Ctrl+C 关闭本次子进程；旧 exe 需要重新打包才包含新代码。
 
 ## 1. 当前产品定位
 

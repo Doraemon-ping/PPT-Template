@@ -230,7 +230,6 @@ button:disabled{opacity:.5;cursor:not-allowed}.page-item .page-tools{display:fle
   <div class="dialog-footer"><span class="hint" style="flex:1">插入的是独立副本，可在当前方案继续编辑。</span><button class="pri" id="btnConfirmReuse" disabled>插入这一页</button></div>
 </dialog>
 
-<script src="/static/dfm_catalog.js"></script>
 <script src="/static/editor_models.js"></script>
 <script>
 "use strict";
@@ -245,10 +244,12 @@ var FORM_PARAMS=new URLSearchParams(location.search),FORM_APP=FORM_PARAMS.get('a
 LS_KEY+=':'+FORM_APP+':'+(FORM_PROJECT||'templates');
 function scopedUrl(path){var url=new URL(path,location.origin);url.searchParams.set('app_id',FORM_APP);return url.pathname+url.search;}
 var CANVAS_W = 1000; // 设计宽度(px)，EMU->px 由缩放换算
-var CAT = window.DFM_CATALOG || {fields:[],tables:{},images:{},derived:{},results:{}};
+var CAT = {fields:[],tables:{},images:{},derived:{},results:{}};
 
 /* ---------- 字段中文翻译：项目信息.封面信息.项目名称（参考格式） ---------- */
 function fieldMeta(path){
+  var entry=CAT.fields.find(function(x){return x.path===path;});
+  if(entry)return {label:entry.label,pathLabel:[entry.module,entry.group,entry.label].filter(Boolean).join('.'),sourcePath:entry.source_path||''};
   if(path.indexOf('f.')===0){
     var f=CAT.fields.find(function(x){return x.path===path;});
     if(f)return {label:f.label, pathLabel:f.module+'.'+f.group+'.'+f.label, sourcePath:f.source_path||''};
@@ -337,22 +338,14 @@ function ensureEditablePage(){
 async function loadData(){
   var which=$('#selData').value;
   var version=(state.dataRequest||0)+1;state.dataRequest=version;
-  var loaded;
-  if(which.indexOf('saved:')===0)loaded=(await(await api('/api/form-apps/'+FORM_APP+'/projects/'+which.slice(6))).json()).data;
-  else if(which==='defaults')loaded=await(await api('/api/form-apps/'+FORM_APP+'/defaults')).json();
-  else if(which==='demo')loaded=await (await api('/api/demo')).json();
-  else if(which==='project')loaded=await (await api('/api/project/load')).json();
-  else loaded={f:{},t:{},i:{}};
-  if(FORM_APP!=='dfm'){
-    var freshCatalog=await(await api('/api/form-apps/'+FORM_APP+'/catalog'+(which.indexOf('saved:')===0?'?project_id='+encodeURIComponent(which.slice(6)):''))).json();
-    if(state.dataRequest!==version)return false;CAT=freshCatalog;state.data=loaded;renderFieldHint();return true;
+  if(which==='empty'){
+    state.data={f:{},t:{},i:{},_ppt_context_version:1};renderFieldHint();return true;
   }
-  var calc=await api('/api/calc',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({f:loaded.f||{},t:loaded.t||{},apply_machine:false})}).then(function(r){return r.json();});
+  var projectId=which.indexOf('saved:')===0?which.slice(6):'defaults';
+  var snapshot=await(await api('/api/ppt/sources/'+encodeURIComponent(FORM_APP)+'/projects/'+encodeURIComponent(projectId)+'/snapshot')).json();
   if(state.dataRequest!==version)return false;
-  loaded.derived=calc.derived;loaded.calc_results={};
-  Object.keys(calc.results).forEach(function(k){loaded.calc_results[k]={verdict:calc.results[k].verdict};});
-  state.data=loaded;
+  CAT=snapshot.catalog;state.data=snapshot.data;
+  document.querySelector('header .back').href=snapshot.form_url;
   renderFieldHint();
   return true;
 }
@@ -426,7 +419,7 @@ function persistDeck(){try{localStorage.setItem(LS_KEY,JSON.stringify({template:
 }
 async function syncDeckDraft(){
   if(draftSaving||!draftPending)return;draftPending=false;draftSaving=true;$('#draftSyncStatus').textContent='正在保存工作台草稿…';
-  try{var res=await api('/api/form-apps/'+FORM_APP+'/drafts/'+(FORM_PROJECT||'templates'),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:draftRevision,payload:{template:state.template,baseTemplate:state.baseTemplate,deck:state.deck}})});
+  try{var res=await api('/api/ppt/sources/'+FORM_APP+'/drafts/'+(FORM_PROJECT||'templates'),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:draftRevision,payload:{template:state.template,baseTemplate:state.baseTemplate,deck:state.deck}})});
     draftRevision=(await res.json()).revision;$('#draftSyncStatus').textContent='工作台草稿已保存到服务端';
   }catch(e){draftReady=false;draftPending=false;$('#draftSyncStatus').textContent='草稿未同步：'+e.message+'。当前浏览器备份仍保留，可先保存为方案。';}
   finally{draftSaving=false;if(draftPending)syncDeckDraft();}
@@ -1194,7 +1187,7 @@ async function generate(){
   if(!state.template){toast('请先加载模板');return;}
   if(!state.deck.length){toast('报告页面为空');return;}
   var slides=buildDeckSlides();
-  var data={f:state.data.f||{},t:state.data.t||{},i:state.data.i||{}};
+  var data=Object.assign({},state.data);
   // Native HTML projects keep the original snapshot as the source of truth.
   // Pass it through so the server can normalize source-specific paths and
   // validate that every imported-PPT target was explicitly bound.
@@ -1295,18 +1288,18 @@ function restore(){
 }
 window.addEventListener('DOMContentLoaded',async function(){
 try{
-var formApp=await(await api('/api/form-apps/'+FORM_APP)).json();
-CAT=await(await api('/api/form-apps/'+FORM_APP+'/catalog'+(FORM_PROJECT?'?project_id='+encodeURIComponent(FORM_PROJECT):''))).json();
+var formApp=await(await api('/api/ppt/sources/'+FORM_APP)).json();
 document.querySelector('header b').textContent=formApp.name+' · PPT 工作台';
 document.title=formApp.name+' · PPT 工作台';
-document.querySelector('header .back').href='/forms?app_id='+FORM_APP;
-document.querySelector('header .back').textContent='← 返回表单应用';
-var projects=(await(await api('/api/form-apps/'+FORM_APP+'/projects')).json()).projects;
-$('#selData').innerHTML=projects.map(function(p){return '<option value="saved:'+p.id+'">'+esc(p.name)+' · 版本 '+p.revision+'</option>';}).join('')+(FORM_APP==='dfm'?'<option value="demo">DFM 示例数据</option><option value="project">旧版项目数据</option>':'<option value="defaults">表单默认值</option>')+'<option value="empty">空数据</option>';
+document.querySelector('header .back').href=formApp.form_url;
+document.querySelector('header .back').textContent='← 返回表单';
+var projects=(await(await api('/api/ppt/sources/'+FORM_APP+'/projects')).json()).projects;
+$('#selData').innerHTML=projects.map(function(p){return '<option value="saved:'+p.id+'">'+esc(p.name)+' · 版本 '+p.revision+'</option>';}).join('')+'<option value="defaults">默认数据</option><option value="empty">空数据</option>';
 if(FORM_PROJECT)$('#selData').value='saved:'+FORM_PROJECT;
-else $('#selData').value=FORM_APP==='dfm'?'demo':'defaults';
+else $('#selData').value=projects.length?'saved:'+projects[0].id:'defaults';
+if(FORM_PROJECT&&!projects.some(function(p){return p.id===FORM_PROJECT;}))throw new Error('项目不存在或已删除，请返回表单选择项目');
 restore();
-var draft=await(await api('/api/form-apps/'+FORM_APP+'/drafts/'+(FORM_PROJECT||'templates'))).json();draftRevision=draft.revision;
+var draft=await(await api('/api/ppt/sources/'+FORM_APP+'/drafts/'+(FORM_PROJECT||'templates'))).json();draftRevision=draft.revision;
 if(draft.payload){state.template=draft.payload.template;state.baseTemplate=draft.payload.baseTemplate;state.deck=draft.payload.deck||[];state.current=0;}
 draftReady=true;$('#draftSyncStatus').textContent=draft.payload?'已载入服务端工作台草稿':'工作台修改将自动保存到服务端';
 await refreshTemplates();
@@ -1319,6 +1312,6 @@ if(FORM_PARAMS.get('scheme'))$('#btnSchemeLoad').click();
 }catch(e){toast('工作台初始化失败：'+e.message);}
 });
 </script>
-<script src="/static/editor_ux.js"></script>
+<script src="/static/editor_ux.js?v=services-v2"></script>
 </body>
 </html>

@@ -216,7 +216,7 @@ class TablePaginationTests(unittest.TestCase):
                 target.write_bytes(b'png')
                 return target
             registry = SimpleNamespace(resolve=lambda _: SimpleNamespace(path=template))
-            with patch('app.main._registry', return_value=registry), patch('app.report.ppt.slide_preview.render_slide_preview', side_effect=render):
+            with patch('app.services.workbench._registry', return_value=registry), patch('app.report.ppt.slide_preview.render_slide_preview', side_effect=render):
                 response = TestClient(app).post('/api/template/live-preview', json={'template': 'test', 'slide': spec().model_dump(), 'data': data(5), 'page': 2})
             self.assertEqual(200, response.status_code, response.text)
             self.assertEqual('2', response.headers['x-dfm-preview-pages'])

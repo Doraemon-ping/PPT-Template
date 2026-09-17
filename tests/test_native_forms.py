@@ -4,12 +4,17 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from app.main import app
-from app.native_forms import normalize, key
+from app.native_forms import JSON_ADAPTER, normalize, key
 
 SOURCE = b'''<html><head><title>Native fixture</title></head><body><div id="form"></div><script>
 var G={part:'fixture'},PR=[],MDB=[],TDB=[],IS=[],FDB=[],IDB=[],VH=[],GLBL={part:'Part'};
 function applyData(d){G=d.G;} function exportData(){} function render(){document.getElementById('form').textContent=G.part;}
 localStorage.setItem('cncCalcV7','fixture');render();
+</script></body></html>'''
+
+JSON_SOURCE = b'''<html><head><title>JSON fixture</title></head><body><script>
+let model={project:{customer:'A'}};
+window.__DFM_BRIDGE__={version:'1',exportData(){return model;},importData(value){model=value;}};
 </script></body></html>'''
 
 
@@ -20,7 +25,10 @@ def snapshot():
 class NativeFormsTests(unittest.TestCase):
     def setUp(self):
         self.temp=TemporaryDirectory()
-        self.patch=patch('app.main.DATA_DIR',Path(self.temp.name));self.patch.start()
+        self.patch=patch('app.services.hpdc.DATA_DIR',Path(self.temp.name));self.patch.start()
+        for module in ('machining', 'workbench', 'workbench_core'):
+            extra = patch('app.services.' + module + '.DATA_DIR', Path(self.temp.name))
+            extra.start(); self.addCleanup(extra.stop)
         self.client=TestClient(app)
         response=self.client.post('/api/form-apps/import-native',files={'file':('native.html',SOURCE)})
         self.assertEqual(200,response.status_code,response.text)
@@ -170,6 +178,43 @@ class NativeFormsTests(unittest.TestCase):
         text=''.join(xml.xpath('//*[local-name()="t"]/text()'))
         self.assertIn('Customer', text)
         self.assertIn('{f.partNo}', text)
+
+    def test_generic_json_export_is_discovered_projected_and_saved_once(self):
+        imported=self.client.post('/api/form-apps/import-native',files={'file':('generic.html',JSON_SOURCE)})
+        self.assertEqual(200,imported.status_code,imported.text)
+        app_id=imported.json()['id'];base='/api/form-apps/'+app_id
+        self.assertEqual(JSON_ADAPTER,imported.json()['schema']['runtime']['adapter'])
+        runtime={
+            'adapter':JSON_ADAPTER,
+            'source_version':'2026.09',
+            'raw':{
+                'project':{'customer':'ACME','count':2},
+                'processes':[{'name':'OP10','seconds':12},{'name':'OP20','seconds':8}],
+                'tags':['urgent','machining'],
+                'audit':{'changed_by':'hidden'},
+            },
+            'labels':{'project':'项目信息','project.customer':'客户名称','processes':'工序'},
+            'rules':{'exclude':['audit']},
+        }
+        saved=self.client.post(base+'/projects',json={'name':'Generic','data':{'runtime':runtime}})
+        self.assertEqual(200,saved.status_code,saved.text)
+        payload=saved.json()['data']
+        self.assertEqual('ACME',payload['f'][key('project.customer')])
+        self.assertEqual(2,len(payload['t'][key('processes')]))
+        self.assertEqual([{'value':'urgent'},{'value':'machining'}],payload['t'][key('tags')])
+        self.assertNotIn(key('audit.changed_by'),payload['f'])
+        catalog=self.client.get(base+'/catalog',params={'project_id':saved.json()['id']}).json()
+        self.assertEqual('客户名称',next(f['label'] for f in catalog['fields'] if f['path']=='f.'+key('project.customer')))
+        self.assertEqual({'name':'name','seconds':'seconds'},catalog['tables'][key('processes')]['columns'])
+
+        # Persisted revisions contain the authoritative runtime only; the
+        # rebuildable projection is not duplicated beside a large raw export.
+        from app.form_platform import PlatformStore
+        store=PlatformStore(Path(self.temp.name)/'form_platform')
+        with store.connect() as db:
+            row=db.execute('SELECT data_json FROM projects WHERE id=?',(saved.json()['id'],)).fetchone()
+        stored=__import__('json').loads(row['data_json'])
+        self.assertEqual({'runtime'},set(stored))
 
 
 if __name__=='__main__':unittest.main()

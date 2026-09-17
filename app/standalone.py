@@ -83,7 +83,7 @@ def main() -> None:
     import uvicorn
 
     from app.logging_setup import configure_logging, uvicorn_log_config
-    from app.main import APP_ROOT
+    from app.settings import APP_ROOT
 
     # 应用侧日志（控制台 + data/logs/server.log）
     log_path = configure_logging(APP_ROOT, os.environ.get("DFM_LOG_LEVEL", "INFO").upper())
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     except Exception as exc:  # noqa: BLE001
         print(f"[DFM] 启动失败: {exc}", file=sys.stderr)
         try:
-            from app.main import DATA_DIR
+            from app.settings import DATA_DIR
 
             DATA_DIR.mkdir(parents=True, exist_ok=True)
             with open(DATA_DIR / "startup-error.log", "w", encoding="utf-8") as fp:

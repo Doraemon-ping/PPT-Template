@@ -1,9 +1,9 @@
 /* Original HTML is never inserted into the host DOM as executable markup. */
 window.NativeFormHost=(function(){
-  let frame=null, channel=null, pending=new Map(), mounted=false, originalSource='';
+  let frame=null, channel=null, pending=new Map(), mounted=false, originalSource='',currentAdapter='';
   /* 局域网 http 访问属非安全上下文，crypto.randomUUID 不存在；统一走带回退的生成器 */
   const dfmUuid=window.dfmUuid||(()=>'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);}));
-  function dispose(){mounted=false;for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error('表单已切换'));}pending.clear();frame?.remove();frame=null;channel=null;}
+  function dispose(){mounted=false;for(const p of pending.values()){clearTimeout(p.timer);p.reject(new Error('表单已切换'));}pending.clear();frame?.remove();frame=null;channel=null;currentAdapter='';}
   function request(type,runtime){
     if(!frame||!mounted)return Promise.reject(new Error('原样表单尚未就绪，请等待页面加载'));
     return new Promise((resolve,reject)=>{
@@ -25,13 +25,13 @@ window.NativeFormHost=(function(){
       }catch(_){ }
       throw new Error('无法读取原 HTML 或数据桥接脚本'+(detail?('：'+detail):''));
     }
-    const source=await response.json(),bridge=await scriptResponse.text();originalSource=source.html;
+    const source=await response.json(),bridge=await scriptResponse.text();originalSource=source.html;currentAdapter=source.adapter;
     channel=dfmUuid();
     const doc=new DOMParser().parseFromString(source.html,'text/html');
     doc.querySelectorAll('base,meta[http-equiv],iframe,object,embed,script[src],link').forEach(n=>n.remove());
     const policy=doc.createElement('meta');policy.httpEquiv='Content-Security-Policy';
     policy.content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'";
-    const shim=doc.createElement('script');shim.textContent=bridge.replace('__CHANNEL__',JSON.stringify(channel));
+    const shim=doc.createElement('script');shim.textContent=bridge.replace('__CHANNEL__',JSON.stringify(channel)).replace('__ADAPTER__',JSON.stringify(currentAdapter));
     doc.head.prepend(policy,shim);
     frame=document.createElement('iframe');frame.title='原样 HTML 表单';
     frame.setAttribute('sandbox','allow-scripts allow-modals allow-downloads');
@@ -65,7 +65,7 @@ window.NativeFormHost=(function(){
     if(msg.type==='dirty'){NativeFormHost.onDirty?.();return;}
     const p=pending.get(msg.id);if(!p)return;
     pending.delete(msg.id);clearTimeout(p.timer);
-    if(msg.type==='snapshot'&&msg.runtime?.adapter==='dfm_quote_v1')p.resolve(msg.runtime);
+    if(msg.type==='snapshot'&&msg.runtime?.adapter===currentAdapter)p.resolve(msg.runtime);
     else p.reject(new Error(msg.error||'数据桥接响应无效'));
   });
   return {mount,dispose,snapshot:()=>request('snapshot'),onDirty:null};

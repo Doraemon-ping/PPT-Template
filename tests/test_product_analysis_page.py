@@ -6,6 +6,7 @@ from app.report.ppt.deck import DeckDefinition
 from app.report.ppt.openxml.package_editor import OoxmlPackage
 from app.report.ppt.openxml.shape_inventory import ShapeInventoryScanner
 from app.report.ppt.template_engine import TemplateEngine
+from app.provider_context import build_legacy_context
 from scripts.generate_product_analysis_page import build_slide
 
 
@@ -26,7 +27,7 @@ class ProductAnalysisPageTests(TestCase):
         deck = DeckDefinition(
             template="product-analysis", output_mode="in_place", slides=[build_slide(TEMPLATE)]
         )
-        result = TemplateEngine(TEMPLATE).generate(deck, demo_state())
+        result = TemplateEngine(TEMPLATE).generate(deck, build_legacy_context(demo_state()))
         package = OoxmlPackage(result.buffer)
         slide = package.read("ppt/slides/slide1.xml").decode("utf-8")
         self.assertIn("TP-HPDC-2026-0087", slide)

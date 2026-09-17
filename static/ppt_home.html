@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PPT 模板工作台</title>
+<style>body{margin:0;background:#f3f5f8;color:#263244;font:15px/1.6 'Microsoft YaHei',sans-serif}main{max-width:960px;margin:60px auto;padding:24px}h1{font-size:30px}#sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}article{padding:24px;background:white;border:1px solid #dce2eb;border-radius:12px}a{display:inline-block;margin-right:16px;color:#a74700}#status{color:#9b3b25}</style></head>
+<body><main><h1>PPT 模板工作台</h1><p>选择数据源，导入模板、绑定字段并生成报告。</p><p id="status" role="status">正在连接数据源…</p><div id="sources"></div></main><script>
+const escapeHtml=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+fetch('/api/ppt/sources').then(async response=>{if(!response.ok)throw new Error('数据源列表加载失败');return response.json();}).then(result=>{
+document.querySelector('#status').textContent=result.errors.map(e=>e.detail).join('；');
+document.querySelector('#sources').innerHTML=result.sources.map(s=>'<article><h2>'+escapeHtml(s.name)+'</h2><p>独立模板与绑定方案</p><a href="/template-editor?app_id='+encodeURIComponent(s.id)+'">进入模板工作台 →</a></article>').join('');
+}).catch(error=>document.querySelector('#status').textContent=error.message);
+</script></body></html>

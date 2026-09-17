@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib
 import sys
 
-from app.main import _registry
+from app.services.workbench import _registry
 from app.demo import demo_state
 from app.report.ppt.deck import DeckDefinition, DeckSlide
 from app.report.ppt.template_engine import TemplateEngine

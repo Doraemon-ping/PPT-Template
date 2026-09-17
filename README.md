@@ -1,8 +1,14 @@
 # HPDC DFM 报告自动生成工具（FastAPI 版）
 
+> **当前架构（2026-09-17）：压铸表单、机加表单、通用 PPT 工作台已拆为三个独立 FastAPI 服务。** 运行 `.\.venv\Scripts\python.exe run_services.py` 启动，分别访问 8001、8002、8003；Ctrl+C 停止。后续项目只需实现 v1 数据提供 API，无须修改 PPT 引擎。详见 [三服务架构、迁移与新项目接入](docs/SERVICE_ARCHITECTURE.md)。原 8000 单端口入口保留兼容。
+
 > 完整更新记录见 [项目更新记录](docs/CHANGELOG.md)；本文保留快速开始、API 和当前工作台用法。
 
 > 维护约定：后续每次功能或修复都要同步追加 [项目更新记录](docs/CHANGELOG.md)，并更新受影响的接口/交接文档。
+
+> 2026-09-17：原始 `DFM机加模版.html` 已专用集成为 [机加 DFM 工作台](http://127.0.0.1:8000/machining-dfm)。原表单计算、图片及 PPT/价格导出逻辑保留；项目、历史版本、设备/刀具/夹具/检具基础库、后台配置和密码哈希均由 FastAPI + SQLite 管理，运行数据独立存放在 `data/machining_dfm/`，静态 HTML/JS 不再内嵌业务数据或明文密码。
+
+> 2026-09-17：新增 [通用 JSON 原样表单适配器](docs/JSON_EXPORT_ADAPTER.md)。已有完整 JSON 导入/导出的 HTML 工具只需提供稳定的 `exportData/importData` 契约，即可保存完整快照并自动生成 PPT 字段目录。
 
 > 2026-09-09：新增 [表单中心](http://127.0.0.1:8000/forms)，支持 HTML 字段识别与确认、复杂 DFM/报价 HTML 的原样运行+数据桥接、独立表单应用、命名数据项目/历史恢复、按应用隔离的 PPT 工作台和服务端草稿。实现、部署边界与接手说明见 [多表单平台交接](docs/FORM_PLATFORM_2026-09-09.md)。当前为本机服务端存储，尚未加入多用户登录权限或云端部署。
 
@@ -29,7 +35,10 @@
 ```
 6-DFM自动生成/
 ├── app/
-│   ├── main.py        # FastAPI 应用与路由
+│   ├── main.py        # 单端口兼容网关
+│   ├── services/      # 独立 hpdc / machining / workbench 服务及 API 连接层
+│   ├── integration_contract.py # PPT 数据提供方 v1 契约
+│   ├── machining_dfm.py # 机加 DFM 项目、公共基础库、后台配置与权限 API
 │   ├── calc.py        # 工艺计算引擎（原 JS 全部 calc_*/r_* 函数）
 │   ├── machines.py    # 压铸机参数库 / 顶杆规格 / 浇口速度对照表
 │   ├── ppt.py         # 当前生产路径：python-pptx 生成 47 页 PPT
@@ -44,8 +53,9 @@
 │   ├── utils.py       # 通用工具（num / fmt / esc 等）
 │   └── assets/logo.png
 ├── static/
-│   └── index.html     # 前端界面（渲染引擎 + API 调用）
-├── data/              # 服务器保存的项目（project.json）
+│   ├── index.html     # 高压压铸 DFM 前端界面
+│   └── machining_dfm/ # 从原单文件拆出的机加 DFM 前端资源
+├── data/              # 服务器运行数据；机加数据和迁移备份位于 machining_dfm/
 ├── docs/              # 架构、交接与完成说明文档
 ├── templates/         # 试点/实验模板、样张与占位符演示模板
 ├── tools/             # 模板构建、占位符扫描 CLI、退役审计
@@ -69,6 +79,11 @@ uvicorn app.main:app --reload
 | --- | --- | --- |
 | GET | `/` | 前端界面 |
 | GET | `/forms` | 多表单应用中心：导入 HTML、管理数据项目并进入对应 PPT 工作台 |
+| GET | `/machining-dfm` | 机加 DFM 专用工作台（原页面逻辑 + 服务端项目管理） |
+| GET/POST/PUT | `/api/machining-dfm/projects*` | 机加 DFM 项目、历史版本、逻辑删除与恢复；数据位于 `data/machining_dfm/` |
+| GET/PUT | `/api/machining-dfm/libraries` | 设备、刀具、夹具、检具公共基础库；写入需要管理员令牌 |
+| GET/PUT | `/api/machining-dfm/config` | 工作台名称与自动保存等后台配置；写入需要管理员令牌 |
+| POST/PUT | `/api/machining-dfm/auth/*` | 后台登录与改密；密码仅以 PBKDF2 哈希保存在数据库 |
 | GET/POST | `/api/form-apps` | 表单应用列表、普通 HTML 字段发现与原样 HTML 导入 |
 | GET/POST/PUT | `/api/form-apps/{app_id}/projects*` | 按应用隔离的数据项目、服务端草稿、版本历史、归档和 JSON 导出 |
 | POST | `/api/calc` | 工艺计算。请求 `{f, t, apply_machine}`，返回 `{derived, machine_fill, results}`（结果含界面 HTML 与 PPT 结论文本） |
@@ -90,6 +105,8 @@ uvicorn app.main:app --reload
 | GET | `/api/demo` | 示例项目数据 |
 | GET | `/api/project/load` | 载入服务器保存的项目（`data/project.json`） |
 | POST | `/api/project/save` | 保存项目到服务器 |
+
+机加 DFM 首次建库会沿用原工具的初始密码：工艺设置 `TP123456`、管理员 `TP23456`。进入页面顶部的“后台配置”后应立即修改；改密后数据库仅保存加盐哈希。SQLite 中 `projects/revisions` 只保存项目业务状态，公共数据分别位于 `equipment/tools/fixtures/gauges`，后台参数和权限分别位于 `app_settings/auth_settings`。旧库首次迁移前会自动备份到 `data/machining_dfm/backups/pre-library-decoupling.sqlite3`。
 
 表单应用的模板、方案和草稿均按 `app_id` 隔离。普通 HTML 进入统一字段表单；受支持的复杂
 DFM/报价 HTML 进入“原样运行 HTML + 数据桥接”，PPT 工作台不会把旧 DFM 字段名自动当作新表单字段。

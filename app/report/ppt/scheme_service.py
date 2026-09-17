@@ -25,9 +25,9 @@ class SchemeError(RuntimeError):
 
 
 class SchemeService:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, storage_root=None) -> None:
         self.root = Path(root)
-        self.storage = self.root / STORAGE_DIR / SCHEMES_SUBDIR
+        self.storage = Path(storage_root) if storage_root is not None else self.root / STORAGE_DIR / SCHEMES_SUBDIR
 
     # ------------------------------------------------------------------ save
     def save(
