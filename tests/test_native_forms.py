@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from fastapi.testclient import TestClient
-from app.main import app
+from app.services.hpdc import app
 from app.native_forms import JSON_ADAPTER, normalize, key
 
 SOURCE = b'''<html><head><title>Native fixture</title></head><body><div id="form"></div><script>
@@ -26,9 +26,7 @@ class NativeFormsTests(unittest.TestCase):
     def setUp(self):
         self.temp=TemporaryDirectory()
         self.patch=patch('app.services.hpdc.DATA_DIR',Path(self.temp.name));self.patch.start()
-        for module in ('machining', 'workbench', 'workbench_core'):
-            extra = patch('app.services.' + module + '.DATA_DIR', Path(self.temp.name))
-            extra.start(); self.addCleanup(extra.stop)
+        # 本分支只包含 hpdc 服务；机加/工作台模块不存在，无需再隔离它们的 DATA_DIR。
         self.client=TestClient(app)
         response=self.client.post('/api/form-apps/import-native',files={'file':('native.html',SOURCE)})
         self.assertEqual(200,response.status_code,response.text)
@@ -88,31 +86,6 @@ class NativeFormsTests(unittest.TestCase):
         other=self.client.post('/api/form-apps/import-native',files={'file':('native.html',SOURCE)}).json()['id']
         self.assertEqual(404,self.client.get('/api/form-apps/'+other+'/catalog',params={'project_id':p['id']}).status_code)
 
-    def test_native_snapshot_generates_text_and_image_binding(self):
-        import io, zipfile
-        from lxml import etree
-        template=Path('templates/DFM_Template_Placeholder_Demo.pptx')
-        upload=self.client.post('/api/templates/upload?app_id='+self.app_id+'&template_id=native-smoke',files={'file':(template.name,template.read_bytes())})
-        self.assertEqual(200,upload.status_code,upload.text); template_id=upload.json()['template']['template_id']
-        p=self.client.post(self.base+'/projects',json={'name':'Native','data':{'runtime':snapshot()}}).json()
-        payload={'name':'Native smoke','template':template_id,'slides':[{'source':1,'bindings':{'text':{'type':'text','shape':'COVER_PART_NUMBER','source':'f.custName'}}},{'source':2,'bindings':{'image':{'type':'image','shape':'PART_IMAGE','source':'i.'+key('G.pI')+'[0]'}}}]}
-        self.assertEqual(200,self.client.post('/api/schemes?app_id='+self.app_id,json=payload).status_code)
-        response=self.client.post('/api/schemes/Native smoke/generate?app_id='+self.app_id,json={'data':p['data']})
-        self.assertEqual(200,response.status_code,response.text[:300]); package=zipfile.ZipFile(io.BytesIO(response.content)); xml=etree.fromstring(package.read('ppt/slides/slide1.xml'))
-        self.assertIn('Customer',xml.xpath('//*[local-name()="t"]/text()'))
-        self.assertTrue(etree.fromstring(package.read('ppt/slides/slide2.xml')).xpath('//*[local-name()="pic"]'))
-
-        # Updating the same project URL must feed the latest snapshot into the
-        # next render, never the customer value used by the previous render.
-        raw=snapshot();raw['state']['G']['cust']='New Energy'
-        updated=self.client.put(self.base+'/projects/'+p['id'],json={'name':'Native','revision':p['revision'],'data':{'runtime':raw}}).json()
-        response=self.client.post('/api/schemes/Native smoke/generate?app_id='+self.app_id,json={'data':updated['data']})
-        self.assertEqual(200,response.status_code,response.text[:300])
-        package=zipfile.ZipFile(io.BytesIO(response.content));xml=etree.fromstring(package.read('ppt/slides/slide1.xml'))
-        text=xml.xpath('//*[local-name()="t"]/text()')
-        self.assertIn('New Energy',text)
-        self.assertNotIn('Customer',text)
-
     def test_legacy_template_aliases_are_projected(self):
         raw=snapshot();raw['state']['G']['cust']='Customer alias'
         normalized,_=normalize(raw)
@@ -141,43 +114,6 @@ class NativeFormsTests(unittest.TestCase):
         self.assertIn('f.'+key('G.cust'), paths)
         self.assertNotIn('f.custName', paths)
         self.assertNotIn('f.partNo', paths)
-
-    def test_native_generation_allows_unbound_template_targets(self):
-        import io, zipfile
-        from lxml import etree
-        template=Path('templates/DFM_Template_Placeholder_Demo.pptx')
-        upload=self.client.post('/api/templates/upload?app_id='+self.app_id+'&template_id=native-targets',files={'file':(template.name,template.read_bytes())})
-        self.assertEqual(200,upload.status_code,upload.text); template_id=upload.json()['template']['template_id']
-        raw=snapshot(); raw['state']['G'].update({'dfmDate':'2026-09-09','custVer':'A1'})
-        project=self.client.post(self.base+'/projects',json={'name':'Targets','data':{'runtime':raw}}).json()
-        def src(path): return 'f.'+key(path)
-        bindings={
-            'COVER_PART_NUMBER': {'type':'text','shape':'COVER_PART_NUMBER','source':src('G.part')},
-            'COVER_PROJECT_NAME': {'type':'text','shape':'COVER_PROJECT_NAME','source':src('G.part')},
-            'COVER_CUSTOMER': {'type':'text','shape':'COVER_CUSTOMER','source':src('G.cust')},
-            'COVER_DATE': {'type':'text','shape':'COVER_DATE','source':src('G.dfmDate')},
-            'COVER_VERSION': {'type':'text','shape':'COVER_VERSION','source':src('G.custVer')},
-        }
-        payload={'name':'Native target mapping','template':template_id,'slides':[{'source':1,'bindings':bindings}]}
-        self.assertEqual(200,self.client.post('/api/schemes?app_id='+self.app_id,json=payload).status_code)
-        response=self.client.post('/api/schemes/Native target mapping/generate?app_id='+self.app_id,json={'data':project['data']})
-        self.assertEqual(200,response.status_code,response.text[:300])
-        package=zipfile.ZipFile(io.BytesIO(response.content))
-        xml=etree.fromstring(package.read('ppt/slides/slide1.xml'))
-        text=''.join(xml.xpath('//*[local-name()="t"]/text()'))
-        self.assertIn('Customer',text)
-        self.assertNotIn('{f.',text)
-
-        incomplete={'name':'Native target incomplete','template':template_id,'slides':[{'source':1,'bindings':{'customer':bindings['COVER_CUSTOMER']}}]}
-        self.assertEqual(200,self.client.post('/api/schemes?app_id='+self.app_id,json=incomplete).status_code)
-        partial=self.client.post('/api/schemes/Native target incomplete/generate?app_id='+self.app_id,json={'data':project['data']})
-        self.assertEqual(200,partial.status_code,partial.text[:300])
-        self.assertEqual('4', partial.headers['x-dfm-unbound-targets'])
-        package=zipfile.ZipFile(io.BytesIO(partial.content))
-        xml=etree.fromstring(package.read('ppt/slides/slide1.xml'))
-        text=''.join(xml.xpath('//*[local-name()="t"]/text()'))
-        self.assertIn('Customer', text)
-        self.assertIn('{f.partNo}', text)
 
     def test_generic_json_export_is_discovered_projected_and_saved_once(self):
         imported=self.client.post('/api/form-apps/import-native',files={'file':('generic.html',JSON_SOURCE)})

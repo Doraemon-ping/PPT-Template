@@ -13,7 +13,7 @@ from unittest import mock
 try:
     from fastapi.testclient import TestClient
     from app.services import hpdc as main_module
-    from app.main import app
+    from app.services.hpdc import app
 except ModuleNotFoundError:  # 精简测试环境可能缺少 web 依赖
     TestClient = None
     main_module = None

@@ -9,9 +9,8 @@ from fastapi.testclient import TestClient
 from lxml import etree
 
 from app.form_platform import PlatformStore, discover_html, validate_schema
-from app.main import app
+from app.services.hpdc import app
 from app.report.ppt.openxml.package_editor import OoxmlPackage
-from tests.test_table_pagination import fixture
 
 FIXTURE = Path(__file__).parent / 'fixtures' / 'inspection_form.html'
 
@@ -66,9 +65,7 @@ class FormPlatformAPITests(unittest.TestCase):
         self.temp = TemporaryDirectory()
         self.patch = patch('app.services.hpdc.DATA_DIR', Path(self.temp.name))
         self.patch.start()
-        for module in ('machining', 'workbench', 'workbench_core'):
-            extra = patch('app.services.' + module + '.DATA_DIR', Path(self.temp.name))
-            extra.start(); self.addCleanup(extra.stop)
+        # 本分支只包含 hpdc 服务；机加/工作台模块不存在，无需再隔离它们的 DATA_DIR。
         self.client = TestClient(app)
         self.schema = discover_html(FIXTURE.read_bytes())['schema']
         self.a = self.client.post('/api/form-apps', json={'name':'Inspection','schema':self.schema}).json()['id']
@@ -124,38 +121,10 @@ class FormPlatformAPITests(unittest.TestCase):
         archived=self.client.get('/api/form-apps?archived=true').json()['apps']
         self.assertEqual([self.a],[item['id'] for item in archived if item['id']==self.a])
         self.assertEqual(410,self.client.get(f'/api/form-apps/{self.a}').status_code)
-        self.assertEqual(410,self.client.get('/api/templates?app_id='+self.a).status_code)
         restored=self.client.post(f'/api/form-apps/{self.a}/archive?archived=false')
         self.assertEqual(200,restored.status_code,restored.text)
         self.assertEqual(project['id'],self.client.get(f'/api/form-apps/{self.a}/projects').json()['projects'][0]['id'])
         self.assertEqual(422,self.client.post('/api/form-apps/dfm/archive').status_code)
-
-    def test_template_upload_and_scheme_do_not_leak_across_apps(self):
-        for scope in (self.a,self.b): self.assertEqual([],self.client.get('/api/templates?app_id='+scope).json()['templates'])
-        response=self.client.post('/api/templates/upload?app_id='+self.a+'&template_id=inspection',files={'file':('inspection.pptx',fixture())})
-        self.assertEqual(200,response.status_code,response.text)
-        self.assertEqual([],self.client.get('/api/templates?app_id='+self.b).json()['templates'])
-        slides=[{'source':1,'bindings':{'cell':{'type':'table_cell','shape':'DATA','source':'f.partNo','options':{'row':1,'column':0}}}}]
-        payload={'name':'Report','template':'inspection','slides':slides}
-        self.assertEqual(200,self.client.post('/api/schemes?app_id='+self.a,json=payload).status_code)
-        self.assertEqual([],self.client.get('/api/schemes?app_id='+self.b).json()['schemes'])
-        with patch('app.provider_context.compute_all',side_effect=AssertionError('DFM adapter must not execute')):
-            result=self.client.post('/api/schemes/Report/generate?app_id='+self.a,json={'data':{'f':{'partNo':'EQ-901'}}})
-        self.assertEqual(200,result.status_code,result.text[:100] if result.status_code!=200 else '')
-        package=OoxmlPackage(result.content)
-        root=etree.fromstring(package.read(next(iter(package.slide_parts().values()))))
-        self.assertIn('EQ-901',root.xpath('//*[local-name()="t"]/text()'))
-        self.assertEqual(404,self.client.post('/api/template/inspect?app_id='+self.b,json={'template':'inspection'}).status_code)
-
-    def test_same_filename_import_keeps_first_template(self):
-        url='/api/templates/upload?app_id='+self.a+'&template_id=inspection'
-        first=self.client.post(url,files={'file':('inspection.pptx',fixture())}).json()['template']
-        second=self.client.post(url,files={'file':('inspection.pptx',fixture())}).json()['template']
-        self.assertNotEqual(first['template_id'],second['template_id'])
-        self.assertEqual(2,len(self.client.get('/api/templates?app_id='+self.a).json()['templates']))
-
-    def test_invalid_scope_cannot_fall_back_to_dfm(self):
-        self.assertEqual(404,self.client.get('/api/templates?app_id=../dfm').status_code)
 
     def test_catalog_images_expose_editor_binding_paths(self):
         result=self.client.get(f'/api/form-apps/{self.a}/catalog').json()
@@ -165,10 +134,3 @@ class FormPlatformAPITests(unittest.TestCase):
     def test_invalid_schema_returns_validation_error(self):
         for schema in ({'fields':[None]}, {'fields':[{'key':[]}]}, {'fields':[{'key':'a','label':'A','type':'select','options':['bad']}]}):
             self.assertEqual(422,self.client.post('/api/form-apps',json={'name':'Invalid','schema':schema}).status_code)
-
-    def test_scope_does_not_leak_between_requests(self):
-        self.client.get('/api/templates?app_id='+self.a)
-        self.assertIn('demo',[t['template_id'] for t in self.client.get('/api/templates').json()['templates']])
-
-
-if __name__=='__main__': unittest.main()

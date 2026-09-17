@@ -1,100 +1,65 @@
 # -*- coding: utf-8 -*-
-"""PPT planning boundary.
+"""PPT 生成边界（本分支仅保留 OOXML 绑定层）。
 
-Rendering remains in the legacy ``app.ppt`` module until later migration stages.
+三服务拆分后：
+- 压铸表单服务（hpdc 分支）只用 OOXML 包编辑做模板导入校验与表单平台导出检查；
+- 通用 PPT 工作台（workbench 分支）保留完整引擎（deck / template_engine / scheme / registry）。
 """
 
-from .binding_resolver import SchemaValueResolver
-from .deck import DeckDefinition, DeckPlan, DeckPlanner, DeckSlide, SlideOp
-from .engine import PPTEngine, PPTGenerationResult
-from .exact_engine import ExactTemplateEngine, ExactTemplateGenerationResult
 from .openxml import (  # noqa: F401
     FillStats,
     ImageBindingError,
     ImageBindingFiller,
     OoxmlPackage,
+    OoxmlPackageError,
     PathResolver,
+    PlaceholderMatch,
+    PlaceholderResolutionError,
     PlaceholderScanner,
+    ShapeBindingError,
+    ShapeInfo,
+    ShapeInventoryScanner,
+    SlideRepeaterError,
+    SlideScan,
+    SlideShapeInventory,
     TemplateScan,
+    TemplateShapeInventory,
     TextBindingFiller,
     clone_slide,
+    decode_image_bytes,
+    find_shape,
+    open_package,
     rebuild_presentation,
-)
-from .renderers import (
-    ComplexImagePayload,
-    ComplexImageRenderer,
-    ImageRenderMode,
-    ImageRenderer,
-    RenderContext,
-    SnapshotBackend,
-    TextRenderer,
-)
-from .retirement import LegacyRetirementAudit, audit_legacy_retirement
-from .schema import RendererType, SchemaField, SlideSchema
-from .schema_loader import SlideSchemaLoader, SlideSchemaRegistry
-from .slide_planner import SlidePlanner, SlidePlannerConfig, plan_slides
-from .slide_factory import CreatedSlides, SlideFactory
-from .shape_resolver import ShapeResolver, get_shape
-from .template_engine import GENERATOR_VERSION, TemplateEngine, TemplateEngineResult
-from .template_loader import LoadedTemplate, TemplateLoader
-from .validators import (
-    ReportValidator,
-    SlideValidator,
-    TemplateValidator,
-    ValidationMessage,
-    ValidationResult,
+    set_shape_text,
+    set_table_cell,
+    set_table_rows,
 )
 
 __all__ = [
-    "LoadedTemplate",
-    "LegacyRetirementAudit",
-    "CreatedSlides",
-    "ComplexImagePayload",
-    "ComplexImageRenderer",
-    "DeckDefinition",
-    "DeckPlan",
-    "DeckPlanner",
-    "DeckSlide",
-    "ExactTemplateEngine",
-    "ExactTemplateGenerationResult",
     "FillStats",
-    "GENERATOR_VERSION",
     "ImageBindingError",
     "ImageBindingFiller",
-    "ImageRenderMode",
-    "ImageRenderer",
     "OoxmlPackage",
-    "PPTEngine",
-    "PPTGenerationResult",
+    "OoxmlPackageError",
     "PathResolver",
+    "PlaceholderMatch",
+    "PlaceholderResolutionError",
     "PlaceholderScanner",
-    "RendererType",
-    "RenderContext",
-    "ReportValidator",
-    "SchemaField",
-    "SchemaValueResolver",
-    "ShapeResolver",
-    "SlideOp",
-    "SlideSchema",
-    "SlideSchemaLoader",
-    "SlideSchemaRegistry",
-    "SlideValidator",
-    "SnapshotBackend",
-    "SlidePlanner",
-    "SlidePlannerConfig",
-    "SlideFactory",
-    "TemplateEngine",
-    "TemplateEngineResult",
-    "TemplateLoader",
+    "ShapeBindingError",
+    "ShapeInfo",
+    "ShapeInventoryScanner",
+    "SlideRepeaterError",
+    "SlideScan",
+    "SlideShapeInventory",
     "TemplateScan",
-    "TemplateValidator",
+    "TemplateShapeInventory",
     "TextBindingFiller",
-    "TextRenderer",
-    "ValidationMessage",
-    "ValidationResult",
     "clone_slide",
-    "get_shape",
+    "decode_image_bytes",
+    "find_shape",
+    "open_package",
     "rebuild_presentation",
-    "audit_legacy_retirement",
-    "plan_slides",
+    "set_shape_text",
+    "set_table_cell",
+    "set_table_rows",
 ]

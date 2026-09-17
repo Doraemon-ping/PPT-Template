@@ -1,8 +1,14 @@
-"""Install the versioned export API on form services, not on the PPT service."""
+"""压铸表单服务的数据源导出 API（/api/ppt-provider/v1）与跨服务链接。
+
+本分支只保留压铸部分；机加侧的同名接口在 machining 分支的 provider_api.py 中。
+"""
 import os
 from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+
 from ..integration_contract import snapshot
+
 
 def provider_router():
     def authenticate(authorization: str | None = Header(None)):
@@ -12,12 +18,13 @@ def provider_router():
             raise HTTPException(401, '数据源接口凭证无效')
     return APIRouter(prefix='/api/ppt-provider/v1', dependencies=[Depends(authenticate)])
 
+
 def install_link(app, source_id):
     @app.get('/api/integration/services')
     def service_links(request: Request):
         unified = getattr(request.app.state, 'workbench_url', None) == ''
-        return {'hpdc': '/forms' if unified else os.environ.get('HPDC_PUBLIC_URL', 'http://127.0.0.1:8001').rstrip('/')+'/forms',
-                'machining': '/machining-dfm' if unified else os.environ.get('MACHINING_PUBLIC_URL', 'http://127.0.0.1:8002').rstrip('/')+'/machining-dfm'}
+        return {'hpdc': '/forms' if unified else os.environ.get('HPDC_PUBLIC_URL', 'http://127.0.0.1:8001').rstrip('/') + '/forms',
+                'machining': '/machining-dfm' if unified else os.environ.get('MACHINING_PUBLIC_URL', 'http://127.0.0.1:8002').rstrip('/') + '/machining-dfm'}
 
     @app.get('/api/integration/workbench-link')
     def workbench_link(request: Request, project_id: str = '', app_id: str | None = None):
@@ -28,8 +35,8 @@ def install_link(app, source_id):
         return {'url': base.rstrip('/') + '/template-editor?app_id=' + quote(source, safe='') +
                 ('&project_id=' + quote(project_id, safe='') if project_id else '')}
 
-    # Existing form "generate by scheme" UI is a same-origin HTTP client of
-    # the independent workbench. No shared scheme files or renderer imports.
+    # 表单页「按方案生成」是同源 HTTP 客户端：转发到独立的 PPT 工作台服务，
+    # 不共享方案文件，也不导入渲染器。
     async def proxy(request: Request):
         import httpx
         from fastapi.responses import Response
@@ -40,12 +47,13 @@ def install_link(app, source_id):
             async with httpx.AsyncClient(timeout=180, trust_env=False) as client:
                 result = await client.request(request.method, base + request.url.path, params=query,
                     content=await request.body(), headers={'Content-Type': request.headers.get('Content-Type', 'application/json')})
-            headers = {k:v for k,v in result.headers.items() if k.lower().startswith('x-dfm-') or k.lower() in {'content-type','content-disposition'}}
+            headers = {k: v for k, v in result.headers.items() if k.lower().startswith('x-dfm-') or k.lower() in {'content-type', 'content-disposition'}}
             return Response(result.content, status_code=result.status_code, headers=headers)
         except httpx.HTTPError as exc:
             raise HTTPException(502, 'PPT 工作台无法连接，请启动工作台服务') from exc
-    app.add_api_route('/api/schemes', proxy, methods=['GET','POST'])
-    app.add_api_route('/api/schemes/{scheme_path:path}', proxy, methods=['GET','POST','DELETE'])
+    app.add_api_route('/api/schemes', proxy, methods=['GET', 'POST'])
+    app.add_api_route('/api/schemes/{scheme_path:path}', proxy, methods=['GET', 'POST', 'DELETE'])
+
 
 def install_hpdc(app, store_factory, static_dir, demo_factory, legacy_factory):
     router = provider_router()
@@ -59,11 +67,11 @@ def install_hpdc(app, store_factory, static_dir, demo_factory, legacy_factory):
         application = store.application(source_id)
         if source_id == 'dfm':
             text = (static_dir / 'dfm_catalog.js').read_text(encoding='utf-8')
-            catalog = json.loads(text[text.index('{'):text.rfind('}')+1])
+            catalog = json.loads(text[text.index('{'):text.rfind('}') + 1])
             from ..provider_context import FORMULA_FIELDS
             catalog['fields'].extend({'path': path, 'label': label, 'module': '计算结果', 'group': '公式显示'} for path, label in FORMULA_FIELDS.items())
             # Historical PPT context uses scalar verdicts, not nested objects.
-            catalog['fields'].extend({'path': 'calc_results.'+key, 'label': label, 'module': '计算结果', 'group': '工艺结论'} for key, label in catalog.get('results', {}).items())
+            catalog['fields'].extend({'path': 'calc_results.' + key, 'label': label, 'module': '计算结果', 'group': '工艺结论'} for key, label in catalog.get('results', {}).items())
             catalog['results'] = {}
             return catalog
         if application['schema'].get('runtime'):
@@ -133,47 +141,3 @@ def install_hpdc(app, store_factory, static_dir, demo_factory, legacy_factory):
 
     app.include_router(router)
     install_link(app, 'dfm')
-
-def install_machining(app, store_factory):
-    router = provider_router()
-    from ..native_forms import normalize, DFM_ADAPTER
-
-    def check(source_id):
-        if source_id != 'machining-dfm':
-            raise HTTPException(404, '机加数据源不存在')
-
-    def project_context(state):
-        from ..machining_projection import report_runtime
-        data, catalog = normalize(report_runtime(state), include_legacy_aliases=False)
-        data.pop('runtime', None)
-        return data, catalog
-
-    @router.get('/sources')
-    def sources(request: Request):
-        origin = os.environ.get('MACHINING_PUBLIC_URL', str(request.base_url).rstrip('/'))
-        return {'contract_version': '1.0', 'sources': [{'id': 'machining-dfm', 'name': '机加 DFM', 'form_url': origin + '/machining-dfm', 'contract_version': '1.0'}]}
-
-    @router.get('/sources/{source_id}/projects')
-    def projects(source_id: str):
-        check(source_id)
-        return {'projects': store_factory().list()}
-
-    @router.get('/sources/{source_id}/projects/{project_id}/snapshot')
-    def get_snapshot(source_id: str, project_id: str, request: Request):
-        check(source_id)
-        store = store_factory()
-        record = {'state': store.defaults(), 'name': '默认数据', 'revision': 0} if project_id == 'defaults' else store.get(project_id)
-        data, catalog = project_context(record['state'])
-        origin = os.environ.get('MACHINING_PUBLIC_URL', str(request.base_url).rstrip('/'))
-        return snapshot(source_id, project_id, record['revision'], record['name'], origin + '/machining-dfm?project_id=' + quote(project_id, safe=''), data, catalog)
-
-    @router.post('/sources/{source_id}/normalize')
-    def normalize_data(source_id: str, body: dict):
-        check(source_id)
-        data = body.get('data', {})
-        if 'runtime' in data:
-            return project_context(data['runtime']['state'])[0]
-        return data
-
-    app.include_router(router)
-    install_link(app, 'machining-dfm')

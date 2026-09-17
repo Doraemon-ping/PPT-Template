@@ -1,7 +1,0 @@
-{
-  "connections": [
-    {"id": "hpdc", "base_url": "http://127.0.0.1:8001"},
-    {"id": "machining", "base_url": "http://127.0.0.1:8002"},
-    {"id": "inspection-example", "base_url": "http://127.0.0.1:8010"}
-  ]
-}
