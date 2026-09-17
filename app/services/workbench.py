@@ -633,6 +633,65 @@ def api_schemes_generate(name: str, req: SchemeGenerateRequest):
         },
     )
 
+PPT_V2_TEMPLATE_PATH = BASE_DIR / 'templates' / 'DFM_Master_v1.pptx'
+PPT_V2_SCHEMA_DIR = BASE_DIR / 'app' / 'report' / 'ppt' / 'schemas'
+PPT_V2_TEMPLATE_VERSION = '1'
+
+
+class PptRequest(BaseModel):
+    f: dict = {}
+    t: dict = {}
+    i: dict = {}
+
+
+def _ppt_v2_enabled():
+    return os.getenv("DFM_PPT_V2_ENABLED", "").strip().casefold() in {"1", "true", "yes", "on"}
+
+
+@app.post("/api/ppt/preview-v2")
+def api_ppt_preview_v2(req: PptRequest):
+    """旧版命名形状引擎预览。
+
+    三服务拆分后由压铸表单服务迁入工作台：压铸表单只保留传统 47 页 /api/ppt，
+    命名形状引擎（PPTEngine）随渲染能力留在工作台。
+    """
+    if not _ppt_v2_enabled():
+        raise HTTPException(status_code=503, detail="PPT V2 预览功能未启用")
+    try:
+        from ..dfm import adapt_legacy_report
+        from ..report.ppt import PPTEngine
+
+        report = adapt_legacy_report(req.f, req.t, req.i)
+        template_path = Path(os.getenv("DFM_PPT_V2_TEMPLATE", str(PPT_V2_TEMPLATE_PATH)))
+        schema_dir = Path(os.getenv("DFM_PPT_V2_SCHEMA_DIR", str(PPT_V2_SCHEMA_DIR)))
+        result = PPTEngine(
+            template_path,
+            schema_dir,
+            template_version=PPT_V2_TEMPLATE_VERSION,
+        ).generate(report)
+        filename = safe_filename(req.f).replace("DFM_", "DFM_PREVIEW_V2_", 1)
+        content_disposition = (
+            'attachment; filename="DFM_PREVIEW_V2.pptx"; filename*=UTF-8\'\''
+            + quote(filename)
+        )
+        return Response(
+            content=result.buffer.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={
+                "Content-Disposition": content_disposition,
+                "X-DFM-Engine": "preview-v2",
+                "X-DFM-Template-Version": result.template_version,
+                "X-DFM-Generator-Version": result.generator_version,
+                "X-DFM-Slide-Count": str(len(result.plans)),
+                "X-DFM-Validation-Warnings": str(len(result.validation.warnings)),
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"PPT V2 预览生成失败：{e}") from e
+
+
 install_api(app)
 LOG_FILE = install_logging(app, 'ppt_workbench')
 

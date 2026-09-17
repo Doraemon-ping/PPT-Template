@@ -10,7 +10,7 @@ from app.demo import demo_state
 
 try:
     from fastapi.testclient import TestClient
-    from app.main import app
+    from app.services.workbench import app
 except ModuleNotFoundError:  # Local bundled test runtime may omit web dependencies.
     TestClient = None
     app = None
@@ -196,12 +196,3 @@ class TemplateAPITests(unittest.TestCase):
         deck = Presentation(io.BytesIO(response.content))
         actual = next(s.text for s in deck.slides[0].shapes if s.name == 'COVER_CUSTOMER')
         self.assertEqual(original.replace(token, '局部测试客户'), actual)
-
-    def test_legacy_ppt_route_remains_unchanged(self):
-        response = self.client.post("/api/ppt", json=self.payload)
-        self.assertEqual(200, response.status_code)
-        self.assertEqual(47, len(Presentation(io.BytesIO(response.content)).slides))
-
-
-if __name__ == "__main__":
-    unittest.main()

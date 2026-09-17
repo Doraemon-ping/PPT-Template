@@ -10,7 +10,7 @@ from app.demo import demo_state
 
 try:
     from fastapi.testclient import TestClient
-    from app.main import app
+    from app.services.workbench import app
     from app.dfm import adapt_legacy_report
     from app.report.ppt.engine import GENERATOR_VERSION
     from app.report.ppt.slide_planner import plan_slides
@@ -69,14 +69,3 @@ class PPTPreviewAPITests(unittest.TestCase):
 
         self.assertEqual(500, response.status_code)
         self.assertIn("stage=load", response.json()["detail"])
-
-    def test_legacy_ppt_route_remains_unchanged(self):
-        response = self.client.post("/api/ppt", json=self.payload)
-
-        self.assertEqual(200, response.status_code)
-        self.assertNotIn("x-dfm-engine", response.headers)
-        self.assertEqual(47, len(Presentation(io.BytesIO(response.content)).slides))
-
-
-if __name__ == "__main__":
-    unittest.main()

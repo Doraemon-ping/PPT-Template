@@ -67,7 +67,7 @@ class SchemeServiceTests(unittest.TestCase):
 
 try:
     from fastapi.testclient import TestClient
-    from app.main import app
+    from app.services.workbench import app
 except ModuleNotFoundError:  # Local bundled test runtime may omit web dependencies.
     TestClient = None
     app = None

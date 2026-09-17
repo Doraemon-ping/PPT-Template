@@ -205,7 +205,7 @@ class TablePaginationTests(unittest.TestCase):
 
     def test_preview_api_returns_continuation_count(self):
         from fastapi.testclient import TestClient
-        from app.main import app
+        from app.services.workbench import app
         with TemporaryDirectory() as tmp:
             template = Path(tmp) / 'fixture.pptx'
             template.write_bytes(fixture())
