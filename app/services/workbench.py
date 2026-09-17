@@ -695,6 +695,138 @@ def api_ppt_preview_v2(req: PptRequest):
 install_api(app)
 LOG_FILE = install_logging(app, 'ppt_workbench')
 
+# ============================================================================
+#  数据源接入 API（v1）：表单服务 → 工作台
+#  1) GET  /api/ppt/contract                        契约发现（数据源清单 + 生成入口）
+#  2) GET  /api/ppt/sources/{id}/projects/{pid}/catalog   字段目录（绑定用，不含数据）
+#  3) POST /api/ppt/generate                        按「数据源 + 项目」出报告（调用方不传数据）
+#  工作台通过 /api/ppt-provider/v1 契约向表单服务拉取快照与目录；表单服务侧另有
+#  /api/report/generate 同源转发入口，便于表单页面一键出报告。
+# ============================================================================
+
+class SourceGenerateRequest(BaseModel):
+    source_id: str
+    project_id: str
+    scheme: Optional[str] = None
+    template: Optional[str] = None
+    slides: List[TemplateSlideSpec] = []
+    output_mode: str = "deck"
+    missing: str = "keep"
+
+
+@app.get('/api/ppt/contract')
+async def api_ppt_contract():
+    """数据源契约发现：列出可用数据源与生成/目录/快照入口，供表单服务与第三方接入。"""
+    listing = await hub.sources()
+    return {
+        'contract_version': '1.0',
+        'generate': {
+            'method': 'POST',
+            'path': '/api/ppt/generate',
+            'body': ['source_id', 'project_id', 'scheme 或 template+slides',
+                     'output_mode(deck|in_place)', 'missing(keep|clear|error)'],
+            'response': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        },
+        'catalog': {'method': 'GET', 'path': '/api/ppt/sources/{source_id}/projects/{project_id}/catalog'},
+        'snapshot': {'method': 'GET', 'path': '/api/ppt/sources/{source_id}/projects/{project_id}/snapshot'},
+        'sources': listing.get('sources', []),
+        'errors': listing.get('errors', []),
+    }
+
+
+@app.get('/api/ppt/sources/{source_id}/projects/{project_id}/catalog')
+async def api_ppt_project_catalog(source_id: str, project_id: str):
+    """字段目录（绑定用）：只返回字段/明细表/图片槽位与结论标签，不含项目数据。"""
+    token = scope.set(source_id)
+    try:
+        payload = await hub.snapshot(source_id, project_id)
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f'读取数据源失败：{e}') from e
+    finally:
+        scope.reset(token)
+    return {
+        'contract_version': payload.get('contract_version'),
+        'source_id': source_id,
+        'project_id': project_id,
+        'name': payload.get('name'),
+        'revision': payload.get('revision'),
+        'catalog': payload.get('catalog') or {},
+    }
+
+
+@app.post('/api/ppt/generate')
+async def api_ppt_generate_from_source(req: SourceGenerateRequest):
+    """按「数据源 + 项目」生成 PPT：工作台自行按契约拉取快照，调用方无需传业务数据。"""
+    from ..report.ppt.deck import DeckDefinition, DeckSlide
+    from ..report.ppt.scheme_service import SchemeError
+    from ..report.ppt.template_engine import GENERATOR_VERSION, TemplateEngine
+
+    if req.output_mode not in {'deck', 'in_place'}:
+        raise HTTPException(status_code=422, detail='output_mode 必须是 deck 或 in_place')
+    if req.missing not in {'keep', 'clear', 'error'}:
+        raise HTTPException(status_code=422, detail='missing 必须是 keep / clear / error')
+    if not req.scheme and not req.template:
+        raise HTTPException(status_code=422, detail='需要提供 scheme，或 template + slides')
+
+    token = scope.set(req.source_id)
+    try:
+        payload = await hub.snapshot(req.source_id, req.project_id)
+        data = payload.get('data') or {}
+        if req.scheme:
+            record = _schemes().get(req.scheme)
+            deck_data = record.get('deck') or {}
+            template_id = record['template']
+            slides = deck_data.get('slides', [])
+            deck = DeckDefinition(template=template_id,
+                                  output_mode=deck_data.get('output_mode', 'deck'),
+                                  missing=deck_data.get('missing', 'keep'),
+                                  slides=[DeckSlide(**slide) for slide in slides])
+        else:
+            template_id = req.template
+            slides = [spec.model_dump() for spec in req.slides]
+            deck = DeckDefinition(template=template_id, output_mode=req.output_mode,
+                                  missing=req.missing,
+                                  slides=[DeckSlide(**spec) for spec in slides])
+        template_map = _template_map(template_id, slides)
+        template_path = _registry().resolve(template_id).path
+        result = TemplateEngine(template_path).generate(deck, data, template_map=template_map)
+    except SchemeError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except HTTPException:
+        raise
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f'按数据源生成失败：{e}') from e
+    finally:
+        scope.reset(token)
+
+    stats = result.stats
+    base_name = safe_filename(data.get('f') or {})
+    content_disposition = (
+        'attachment; filename="DFM_SOURCE.pptx"; filename*=UTF-8\'\''
+        + quote(base_name.replace('DFM_', 'DFM_' + req.source_id + '_', 1))
+    )
+    return Response(
+        content=result.buffer,
+        media_type='application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        headers={
+            'Content-Disposition': content_disposition,
+            'X-DFM-Engine': 'openxml-source-v1',
+            'X-DFM-Generator-Version': GENERATOR_VERSION,
+            'X-DFM-Data-Source': req.source_id,
+            'X-DFM-Project': req.project_id,
+            'X-DFM-Project-Revision': str(payload.get('revision', '')),
+            'X-DFM-Template': template_id,
+            'X-DFM-Scheme': quote(req.scheme or '', safe=''),
+            'X-DFM-Slide-Count': str(result.slide_count),
+            'X-DFM-Text-Replaced': str(stats.get('text_replaced', 0)),
+            'X-DFM-Images-Bound': str(stats.get('images_bound', 0)),
+            'X-DFM-Bindings-Applied': str(stats.get('bindings_applied', 0)),
+        },
+    )
+
+
 @app.get('/ppt')
 def workbench_home():
     return FileResponse(STATIC_DIR / 'ppt_home.html')
