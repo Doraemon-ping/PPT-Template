@@ -141,3 +141,65 @@ def install_hpdc(app, store_factory, static_dir, demo_factory, legacy_factory):
 
     app.include_router(router)
     install_link(app, 'dfm')
+    install_report_bridge(app, 'dfm')
+
+
+def install_report_bridge(app, source_id):
+    """表单服务侧的 PPT 生成入口：同源转发到独立工作台，不导入渲染器。
+
+    - GET  /api/report/options   : 工作台地址与该数据源的生成入口（页面/脚本对接用）
+    - GET  /api/report/sources   : 转发工作台 /api/ppt/contract（数据源清单与契约版本）
+    - POST /api/report/generate  : {project_id, scheme | template+slides, output_mode, missing}
+                                   转发到工作台 POST /api/ppt/generate 并回传 pptx
+    """
+    import os
+
+    import httpx
+    from fastapi.responses import Response
+    from pydantic import BaseModel
+
+    class ReportGenerateRequest(BaseModel):
+        project_id: str
+        scheme: str | None = None
+        template: str | None = None
+        slides: list[dict] = []
+        output_mode: str = 'deck'
+        missing: str = 'keep'
+
+    def workbench_base():
+        return os.environ.get('PPT_WORKBENCH_URL', 'http://127.0.0.1:8003').rstrip('/')
+
+    @app.get('/api/report/options')
+    def report_options():
+        base = workbench_base()
+        return {
+            'source_id': source_id,
+            'workbench_url': base,
+            'generate': {'method': 'POST', 'path': '/api/report/generate',
+                         'body': ['project_id', 'scheme 或 template+slides', 'output_mode', 'missing']},
+            'contract': base + '/api/ppt/contract',
+            'catalog': base + '/api/ppt/sources/' + source_id + '/projects/{project_id}/catalog',
+        }
+
+    @app.get('/api/report/sources')
+    async def report_sources():
+        try:
+            async with httpx.AsyncClient(timeout=30, trust_env=False) as client:
+                result = await client.get(workbench_base() + '/api/ppt/contract')
+        except httpx.HTTPError as exc:
+            raise HTTPException(502, 'PPT 工作台无法连接，请启动工作台服务') from exc
+        if result.status_code != 200:
+            raise HTTPException(result.status_code, result.text[:300])
+        return result.json()
+
+    @app.post('/api/report/generate')
+    async def report_generate(req: ReportGenerateRequest):
+        body = {'source_id': source_id, **req.model_dump()}
+        try:
+            async with httpx.AsyncClient(timeout=300, trust_env=False) as client:
+                result = await client.post(workbench_base() + '/api/ppt/generate', json=body)
+        except httpx.HTTPError as exc:
+            raise HTTPException(502, 'PPT 工作台无法连接，请启动工作台服务') from exc
+        headers = {k: v for k, v in result.headers.items()
+                   if k.lower().startswith('x-dfm-') or k.lower() in {'content-type', 'content-disposition'}}
+        return Response(result.content, status_code=result.status_code, headers=headers)
