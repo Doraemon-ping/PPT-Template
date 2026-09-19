@@ -4,11 +4,19 @@ import time
 import uuid
 from collections import deque
 from logging.handlers import RotatingFileHandler
+from typing import Callable
+
+from fastapi import Header
 from fastapi.responses import JSONResponse, FileResponse
 from ..settings import DATA_DIR
 
 
-def install(app, name):
+def install(app, name, guard: Callable[[str | None], None] | None = None):
+    """挂上请求日志与两个日志读取接口。
+
+    ``guard`` 给"日志要鉴权"的服务用：收到 ``Authorization`` 头后自行决定放不放行（不通过就抛）。
+    不传就维持原样（日志接口谁都能读，只适合纯内网的老服务）。
+    """
     path = DATA_DIR / name / 'logs' / 'server.log'
     path.parent.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger('dfm.service.' + name)
@@ -34,12 +42,16 @@ def install(app, name):
         return response
 
     @app.get('/api/logs/tail')
-    def tail(lines: int = 200):
+    def tail(lines: int = 200, authorization: str | None = Header(None)):
+        if guard is not None:
+            guard(authorization)
         with path.open(encoding='utf-8', errors='replace') as stream:
             return {'file': str(path), 'lines': list(deque(stream, maxlen=max(1, min(lines, 2000))))}
 
     @app.get('/api/logs/download')
-    def download():
+    def download(authorization: str | None = Header(None)):
+        if guard is not None:
+            guard(authorization)
         return FileResponse(path, filename=name + '-server.log')
 
     return path

@@ -3,6 +3,15 @@
 The source file remains untouched.  Re-run this script when a newer approved
 single-file HTML is supplied; server persistence is provided by host.js and
 app/machining_dfm.py.
+
+⚠️ **这是"起点生成器"，不是线上页面的唯一来源。** 它写出的 ``index.html`` 停留在阶段 2a 之前：
+模板里没有 ``issue_page.js`` / ``selection_page.js`` / ``history_page.js`` /
+``trash_page.js`` / ``changes_page.js``，版本号也还是 ``?v=process-v1``（现在是 ``?v=trash-v1``）。
+线上跑的是**手工维护**的 ``static/machining_dfm/index.html``。真要重跑这个脚本，
+必须把上面这些脚本标签、版本号与 ``legacy_app.js`` 里的接线一起再补回去，
+否则会把阶段 2a~4 的前端装配冲掉。重跑后请依次跑：
+``tools/check_host_css.py``、``tools/check_served_page.py``、``tools/check_process_wiring.py``、
+``node tools/smoke_machining_page.mjs``、``node tools/check_trash_page.mjs``。
 """
 
 from __future__ import annotations
@@ -13,11 +22,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:  # run either as ``python tools/x.py`` or ``python -m tools.x``
+    from split_machining_seed import split_seed
+except ImportError:  # pragma: no cover - module-style invocation
+    from tools.split_machining_seed import split_seed
+
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SOURCE = Path.home() / "Desktop" / "DFM机加模版.html"
 STATIC = ROOT / "static" / "machining_dfm"
-SEED = ROOT / "app" / "resources" / "machining_dfm_seed.json"
+SEED_DIR = ROOT / "app" / "resources" / "machining_dfm_seed"
 
 
 def between(source: str, opening: str, closing: str, start: int = 0) -> tuple[str, int, int]:
@@ -182,30 +196,37 @@ def main() -> None:
     legacy = legacy.replace(tail, "", 1)
 
     STATIC.mkdir(parents=True, exist_ok=True)
-    SEED.parent.mkdir(parents=True, exist_ok=True)
+    SEED_DIR.mkdir(parents=True, exist_ok=True)
     (STATIC / "app.css").write_text(css.strip() + "\n", encoding="utf-8")
     (STATIC / "legacy_app.js").write_text(legacy.strip() + "\n", encoding="utf-8")
     (STATIC / "pptxgen.bundle.js").write_text(pptx.strip() + "\n", encoding="utf-8")
-    SEED.write_text(json.dumps(seed, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    counts = split_seed(seed, SEED_DIR)
 
     index = f"""<!doctype html>
 <html lang="zh-CN"><head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>机加 DFM · 项目工作台</title>
-<link rel="stylesheet" href="/static/machining_dfm/app.css?v=services-v2">
-<link rel="stylesheet" href="/static/machining_dfm/host.css?v=services-v2">
+<link rel="stylesheet" href="/static/machining_dfm/app.css?v=process-v1">
+<link rel="stylesheet" href="/static/machining_dfm/host.css?v=process-v1">
 </head>
 <body class="server-loading">
 {body.strip()}
-<script src="/static/machining_dfm/host.js?v=services-v2"></script>
-<script src="/static/machining_dfm/legacy_app.js?v=services-v2"></script>
-<script src="/static/machining_dfm/pptxgen.bundle.js?v=services-v2"></script>
+<script src="/static/machining_dfm/host.js?v=process-v1"></script>
+<script src="/static/machining_dfm/machines.js?v=process-v1"></script>
+<script src="/static/machining_dfm/tools.js?v=process-v1"></script>
+<script src="/static/machining_dfm/library_pages.js?v=process-v1"></script>
+<script src="/static/machining_dfm/fixtures.js?v=process-v1"></script>
+<script src="/static/machining_dfm/gauges.js?v=process-v1"></script>
+<script src="/static/machining_dfm/project_info.js?v=process-v1"></script>
+<script src="/static/machining_dfm/process_page.js?v=process-v1"></script>
+<script src="/static/machining_dfm/legacy_app.js?v=process-v1"></script>
+<script src="/static/machining_dfm/pptxgen.bundle.js?v=process-v1"></script>
 <script>MachiningDFMHost.start();</script>
 </body></html>
 """
     (STATIC / "index.html").write_text(index, encoding="utf-8")
-    print(f"integrated {source_file.name}: css={len(css)}, app={len(legacy)}, pptx={len(pptx)}, seed={SEED.stat().st_size}")
+    print(f"integrated {source_file.name}: css={len(css)}, app={len(legacy)}, pptx={len(pptx)}, seed={counts}")
 
 
 if __name__ == "__main__":

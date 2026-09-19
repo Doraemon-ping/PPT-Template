@@ -3,8 +3,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>机加 DFM · 项目工作台</title>
-<link rel="stylesheet" href="/static/machining_dfm/app.css?v=services-v2">
-<link rel="stylesheet" href="/static/machining_dfm/host.css?v=services-v2">
+<link rel="stylesheet" href="/static/machining_dfm/app.css?v=project-v1">
+<link rel="stylesheet" href="/static/machining_dfm/host.css?v=project-v1">
 </head>
 <body class="server-loading">
 <div id="langBox" style="position:fixed;top:8px;right:12px;z-index:999;background:#fff;border:1px solid #cbd5e0;border-radius:16px;padding:3px 10px;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.12)"><select id="langSel" onchange="setLang(this.value)" style="border:none;background:transparent;font-size:12px;outline:none;cursor:pointer;color:#2d3748"><option value="zh">中文</option><option value="en">English</option><option value="th">ไทย</option><option value="es">Español</option></select></div>
@@ -16,8 +16,20 @@
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
   <div class="modal-box" id="modalBox" onclick="event.stopPropagation()"></div>
 </div>
-<script src="/static/machining_dfm/host.js?v=services-v2"></script>
-<script src="/static/machining_dfm/legacy_app.js?v=services-v2"></script>
-<script src="/static/machining_dfm/pptxgen.bundle.js?v=services-v2"></script>
+<script src="/static/machining_dfm/host.js?v=project-v1"></script>
+<script src="/static/machining_dfm/machines.js?v=project-v1"></script>
+<script src="/static/machining_dfm/tools.js?v=project-v1"></script>
+<script src="/static/machining_dfm/library_pages.js?v=project-v1"></script>
+<script src="/static/machining_dfm/fixtures.js?v=project-v1"></script>
+<script src="/static/machining_dfm/gauges.js?v=project-v1"></script>
+<script src="/static/machining_dfm/project_info.js?v=project-v1"></script>
+<script src="/static/machining_dfm/process_page.js?v=project-v1"></script>
+<script src="/static/machining_dfm/issue_page.js?v=project-v1"></script>
+<script src="/static/machining_dfm/selection_page.js?v=project-v1"></script>
+<script src="/static/machining_dfm/history_page.js?v=project-v1"></script>
+<script src="/static/machining_dfm/trash_page.js?v=project-v1"></script>
+<script src="/static/machining_dfm/changes_page.js?v=project-v1"></script>
+<script src="/static/machining_dfm/legacy_app.js?v=project-v1"></script>
+<script src="/static/machining_dfm/pptxgen.bundle.js?v=project-v1"></script>
 <script>MachiningDFMHost.start();</script>
 </body></html>

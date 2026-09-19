@@ -1,0 +1,40 @@
+#serverProjectBar{position:sticky;top:0;z-index:1000;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:#fff;border-bottom:1px solid #dbe3ee;box-shadow:0 2px 10px rgba(26,54,93,.12);font-size:12px}
+#serverProjectBar strong{color:#1a365d;font-size:13px}
+#serverProjectBar select,#serverProjectBar button{border:1px solid #cbd5e0;border-radius:7px;background:#fff;padding:6px 9px;font:inherit;color:#2d3748}
+#serverProjectBar select{min-width:240px;max-width:440px;flex:1}
+#serverProjectBar button{cursor:pointer}
+#serverProjectBar button.primary{background:#2c5282;border-color:#2c5282;color:#fff}
+#serverProjectBar button.danger{color:#c53030}
+#serverProjectBar .server-status{margin-left:auto;color:#718096;white-space:nowrap}
+#serverProjectBar .server-status.error{color:#c53030}
+.server-loading #mainPanels{opacity:.3;pointer-events:none}
+.server-dialog{position:fixed;inset:0;z-index:2000;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.45);padding:18px}
+.server-dialog[hidden]{display:none}
+.server-dialog-box{width:min(620px,96vw);max-height:80vh;overflow:auto;background:#fff;border-radius:14px;padding:16px;box-shadow:0 18px 50px rgba(0,0,0,.22)}
+.server-dialog-head,.server-version{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.server-dialog-head{margin-bottom:10px}.server-dialog-head h2{font-size:17px}.server-dialog-head button,.server-version button{border:1px solid #cbd5e0;border-radius:7px;background:#fff;padding:6px 10px;cursor:pointer}
+.server-version{padding:10px 0;border-top:1px solid #edf2f7}.server-version small{display:block;color:#718096;margin-top:3px}
+.server-dialog-box section>label{display:grid;grid-template-columns:160px 1fr;align-items:center;gap:10px;margin:10px 0;color:#4a5568;font-size:13px}
+.server-dialog-box input,.server-dialog-box select,.server-dialog-box button{border:1px solid #cbd5e0;border-radius:7px;background:#fff;padding:7px 9px;font:inherit;color:#2d3748}
+.server-dialog-box button{cursor:pointer}.server-dialog-box button.primary{background:#2c5282;border-color:#2c5282;color:#fff}
+.server-dialog-box hr{border:0;border-top:1px solid #edf2f7;margin:16px 0}.server-dialog-box .muted{min-height:18px;color:#718096;font-size:12px}
+.server-counts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:6px 0 14px}.server-counts span{padding:10px;border-radius:8px;background:#edf2f7;text-align:center;color:#4a5568}.server-counts b{display:block;margin-top:3px;font-size:18px;color:#1a365d}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+/* 回收站面板（阶段 4）：表格按分组堆卡片，面板自己滚，别把整页顶长 */
+.server-dialog-box.trash-box{width:min(1080px,96vw);max-height:84vh}
+.server-dialog-box.trash-box table{width:100%;border-collapse:collapse;font-size:12px}
+.server-dialog-box.trash-box th,.server-dialog-box.trash-box td{border-bottom:1px solid #edf2f7;padding:5px 7px;text-align:left;vertical-align:top}
+.server-dialog-box.trash-box th{background:#f7fafc;color:#4a5568;font-weight:600;white-space:nowrap}
+/* 回收站页签入口 */
+.tab.trash-tab{white-space:nowrap}
+/* 变更流水时间线（版本履历页签下半部分） */
+.chg-list{border:1px solid #e2e8f0;border-radius:10px;overflow:hidden}
+.chg{padding:7px 10px;border-bottom:1px solid #edf2f7;background:#fff}
+.chg:last-child{border-bottom:0}
+.chg-hd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.chg-label{font-size:12px;color:#1a365d}
+.chg-tag{font-size:10px;color:#2c5282;background:#ebf8ff;border-radius:9px;padding:1px 7px;white-space:nowrap}
+.chg-when{margin-left:auto;font-size:10px;color:#718096;white-space:nowrap}
+.chg-extra{margin-top:3px;font-size:10px;color:#718096;line-height:1.5;word-break:break-all}
+@media(max-width:720px){#serverProjectBar select{min-width:160px;width:100%}#serverProjectBar .server-status{width:100%;margin-left:0}}
+@media(max-width:520px){.server-dialog-box section>label{grid-template-columns:1fr;gap:4px}.server-counts{grid-template-columns:repeat(2,1fr)}}

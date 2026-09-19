@@ -9,6 +9,12 @@ __pycache__/
 data/
 1-基础数据/
 
+# ---- 校验探针的工作副本（_audit/probeN 里是整库副本，脚本本身要提交）----
+_audit/probe*/
+# 探针跑出来的原始输出（一兆多的转储、临时清单），只留脚本
+_audit/*.json
+_audit/*.txt
+
 # ---- 生成/输出产物 ----
 output/
 exact_style_previews/

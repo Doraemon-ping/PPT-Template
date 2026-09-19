@@ -64,7 +64,10 @@ def install_machining(app, store_factory):
     def get_snapshot(source_id: str, project_id: str, request: Request):
         check(source_id)
         store = store_factory()
-        record = {'state': store.defaults(), 'name': '默认数据', 'revision': 0} if project_id == 'defaults' else store.get(project_id)
+        # 附件在库里是磁盘文件 + URL；PPT 需要字节，因此这条路径把设备图片内联成 data URL，
+        # 与拆分前的快照逐字段一致（图片槽位 i.* 的绑定不变）。
+        record = ({'state': store.defaults(inline_assets=True), 'name': '默认数据', 'revision': 0}
+                  if project_id == 'defaults' else store.get(project_id, inline_assets=True))
         data, catalog = project_context(record['state'])
         origin = os.environ.get('MACHINING_PUBLIC_URL', str(request.base_url).rstrip('/'))
         return snapshot(source_id, project_id, record['revision'], record['name'], origin + '/machining-dfm?project_id=' + quote(project_id, safe=''), data, catalog)
