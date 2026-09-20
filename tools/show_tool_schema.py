@@ -31,7 +31,7 @@ print("工具函数插入列顺序:", ", ".join(
 ))
 print()
 
-from app.machining_tools import TOOL_DERIVED, tool_field_headers  # noqa: E402
+from app.domains.tools import TOOL_DERIVED, tool_field_headers  # noqa: E402
 
 print("字段登记表（tools 表）:")
 for item in tool_field_headers():

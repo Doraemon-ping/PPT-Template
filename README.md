@@ -3,7 +3,9 @@
 本分支是三服务拆分的**机加表单服务**独立版本：只包含机加 DFM 表单所需的代码，
 可单独部署运行，不依赖压铸表单服务与 PPT 工作台服务。
 
-- 入口：`app/services/machining.py`（FastAPI 应用对象 `app`）
+- 入口：`app/main.py`（FastAPI 应用工厂 `create_app()`，ASGI 入口 `app`）
+  - 标准启动：`uvicorn app.main:app --port 8002`
+  - 历史启动仍可用：`uvicorn app.services.machining:app --port 8002`（`app/services/machining.py` 只是转发层）
 - 默认地址：`http://127.0.0.1:8002`
 - 数据目录：`data/machining_dfm/`
   - `machining_dfm.sqlite3`：项目、历史版本、设备(`machines`)/刀具(`tools`)/夹具(`fixtures`)/检具(`gauges`)库与类别字典、附件元数据(`assets`)、后台配置
@@ -63,34 +65,79 @@ python run_service.py --port 8012 --reload
 
 ## 目录结构
 
+**2026-09 分层重构后的结构**：标准 FastAPI 分层，依赖方向**严格向下、不设例外**：
+
+```
+api  →  services  →  domains  →  db  →  core
+```
+
+（`app/main.py` 是最外层组合根；`app/machining_dfm.py` 是历史导入路径的兼容转发层，
+两者可以引用任意层。这条规则由 `tests/test_architecture.py` 的 11 条断言钉住，
+其中包含"业务域之间零互引"。旧 → 新路径对照见 `docs/MACHINING_CODE_LAYOUT.md`。）
+
 ```
 app/
-  settings.py               路径配置（BASE_DIR / APP_ROOT / DATA_DIR / STATIC_DIR）
-  machining_dfm.py          机加表单存储与路由（SQLite，含鉴权与后台配置）
-  machining_library.py      通用类型化基础库引擎（字段登记表 / 行级 CRUD / 附件 / 旧数据接入）
-  machining_machines.py     设备库：字段登记表 + machines 表读写、迁移、兜底机型
-  machining_tools.py        刀具库：字段登记表 + 两张字典表（库分类/类型）+ tools 表读写、迁移
-  machining_fixtures.py     夹具库：字段登记表 + 模具中心字典 + fixtures 表读写、迁移
-  machining_gauges.py       检具库：字段登记表 + 检具类别字典 + gauges 表读写、迁移
-  machining_assets.py       附件库：assets 表 + 磁盘文件（内容寻址、去重、ETag）
-  machining_process.py      工序与工序刀具行：project_processes / project_process_tools（含行级读写引擎）
-  machining_issue.py        问题清单：project_issues（工序外键 + 两张图片走附件库）
-  machining_selection.py    选型：project_fixtures（夹具选型）/ project_gauges（检具选型）两张项目级表
-                            （各指自己的库行与类别字典 + 快照；老多态表 project_selections 只当搬迁来源）
-  machining_history.py      版本履历：project_versions（保存版本 kind='save' + 页面履历 kind='history'）
-  machining_changes.py      变更流水：project_changes（谁在什么时候把哪一行改成了什么，只增不改）
-  machining_seed.py         种子数据读取（拆分目录或旧的单文件）
-  machining_projection.py   机加数据 → 报告运行时投影（工序时间、节拍、月产能）
-  native_forms.py           原样 HTML 表单解析/规范化（保存与快照共用）
-  html_literals.py          HTML 内字段声明提取
-  integration_contract.py   数据源契约模型（Snapshot / ReportContext）
-  resources/machining_dfm_seed/  拆分后的种子数据（设备/刀具/夹具/检具 + 设备图片）
-  services/
-    machining.py            本服务入口
+  main.py                   ★ FastAPI 应用工厂 create_app()：路由 + 数据源契约 + 日志 + 静态页面
+  machining_dfm.py          ⚠ 兼容转发层（历史导入路径再导出），新代码别用
+  core/                     底座①：路径配置、通用工具、安全基元（不含业务）
+    config.py               路径配置（BASE_DIR / APP_ROOT / DATA_DIR / STATIC_DIR / SEED_DIR）
+    utils.py                stamp() / compact_json() / js_number()：时间戳与 JSON 口径全项目统一
+    security.py             口令 PBKDF2 摘要、后台令牌签发/校验、角色判定
+  db/                       底座②：连接、共享表 DDL、行级 CRUD 原语（不含业务规则）
+    connection.py           Database：连接生命周期 / rename 用 PRAGMA / 整库备份
+    schema.py               共享表 DDL + 各基础库"结构版本号" + LIBRARY_KEYS/PROJECT_ARRAYS
+    tables.py               表名登记表（各域读表名向下取，不互相 import）
+    library.py              通用类型化基础库引擎（字段登记表 / 行级 CRUD / 附件 / 旧数据接入）
+    rows.py                 ProjectRows：项目级多行表的公共基类（外键/逻辑删除/sort_order）
+    assets.py               附件库：assets 表 + 磁盘文件（内容寻址、去重、ETag）
+  domains/                  业务域：一张表一套规则；**域之间零互引**（跨域编排只能去 services）
+    machines.py             设备库：MACHINE_FIELDS + machines 表 + 兜底机型 + resolve_machine_ref()
+    tools.py                刀具库：TOOL_FIELDS + tools 表 + 两张字典表（库分类/类型）
+    fixtures.py             夹具库：FIXTURE_FIELDS + fixtures 表 + 模具中心字典
+    gauges.py               检具库：GAUGE_FIELDS + gauges 表 + 检具类别字典
+    project.py              项目信息（G 的建模字段）：project_settings 一行一项目
+    process.py              工序与工序刀具行：project_processes / project_process_tools
+    issue.py                问题清单：project_issues（工序外键 + 两张图片走附件库）
+    selection.py            选型：project_fixtures / project_gauges 两张项目级表
+    history.py              版本履历：project_versions（保存版本 kind='save' + 页面履历 kind='history'）
+    changes.py              变更流水：project_changes（谁在什么时候把哪一行改成了什么，只增不改）
+  services/                 应用服务：跨域编排、迁移、导出、种子、数据源投影
+    store.py                ★ 组合根 MachiningDFMStore：接 14 个域引擎 + 跨域编排（项目读写/版本/回收站/流水）
+    migrations.py           建表与幂等迁移（按"结构版本号 + 表在不在"判定，可重复跑）
+    export.py               导出文件包用到的纯函数（包名/附件引用识别/地址改写）
+    seed.py                 种子数据读取（拆分目录或旧的单文件）
+    projection.py           机加数据 → 报告运行时投影（工序时间、节拍、月产能）
+    forms.py                原样 HTML 表单解析/规范化（保存与快照共用）
+    contract.py             数据源契约模型（Snapshot / ReportContext）
     provider_api.py         数据源导出 API + 跨服务链接（本分支只含机加部分）
     observability.py        日志与 /api/logs/* 接口
+    machining.py            ⚠ 兼容转发层（历史启动入口），应用本体在 app/main.py
+  api/                      接口层：HTTP 适配（解析请求 → 调 services → 组装响应），不放业务规则
+    deps.py                 按请求造 store（每次新建 → 改配置/跑完迁移不用重启服务）
+    schemas.py              请求体模型（ProjectWrite / LibraryWrite / LoginRequest / …）
+    routers/                一个业务域一个模块，每个只导出 register()
+      pages.py              单页入口 + bootstrap + 项目默认值
+      projects.py           项目列表/新建/读写/归档/逻辑删除/恢复/版本号
+      trash.py              回收站（查看给两个角色，恢复只给管理员）
+      export.py             导出文件包
+      project_settings.py   项目信息与项目图片
+      process.py            工序 / 工序设备 / 工序图片 / 工序刀具行
+      issue.py              问题清单
+      selection.py          夹具检具选型 + 版本履历 + 变更流水
+      machines.py           设备库
+      tools.py              刀具库 + 刀具字典
+      libraries.py          夹具库/检具库 + 类别字典 + 附件下载 + 整库存档
+      admin.py              后台配置 + 登录 + 改密
+      __init__.py           ★ router_for()：全部 /api/machining-dfm/* 路径的唯一清单
+  resources/machining_dfm_seed/  拆分后的种子数据（设备/刀具/夹具/检具 + 设备图片）
 static/machining_dfm/       机加表单前端（index.html + host.js + machines.js + tools.js + library_pages.js + fixtures.js + gauges.js + project_info.js + process_page.js + issue_page.js + selection_page.js + history_page.js + legacy_app.js + PptxGenJS）
                              （变更流水 3b 没有前端模块：流水由服务端在每个行级写入点记录，页面只读不写）
+tools_audit/                重构验收工具（可长期用）
+  dump_routes.py            导出全部路由到 JSON（与 routes_before.json 对账，必须仍是 139 条）
+  smoke_live.py             真机冒烟：用真库副本打一遍主要读写链路（不碰生产库）
+  graph_imports.py          画出各层真实 import 关系（查反向依赖用）
+  check_undefined_names.py  AST 查"用了但没定义/没 import"的全局名字
+  check_encoding.py         扫 .py 是否都是干净 UTF-8（无 BOM）
 docs/MACHINING_LIBRARY_REFACTOR.md  基础库拆分重构说明（表结构、接口、迁移、前端约定）
 docs/MACHINING_BUSINESS_REFACTOR.md 业务数据重构方案（项目隔离 / 版本管理 / 逻辑删除；第一阶段"项目信息"已落地，见第 10 节）
 docs/MACHINING_BUSINESS_REFACTOR_PHASE1B.md 1b 阶段设计：工序 + 工序刀具行 落表（表结构/引用改造/迁移口径/验收，待拍板）
@@ -101,6 +148,8 @@ docs/MACHINING_BUSINESS_REFACTOR_PHASE3B.md 3b 阶段实施：变更流水落表
 docs/MACHINING_BUSINESS_REFACTOR_PHASE4_DESIGN.md 阶段 4 设计**与实施记录**：逻辑删除 + 回收站 + 变更流水界面（第 5 节 = 后端与前端的落地记录与两遍验收；基础库/字典也进回收站；查看两个角色、恢复只给管理员）
 docs/MACHINING_BUSINESS_REFACTOR_PHASE5.md 阶段 5 验收记录：附件归项目（旧 `cI/bI/aI` 已是真外键）+ 导出改造（导出 JSON / 导出文件包 `.zip`，便携单文件 HTML 已退休；库里 0 行 base64）
 docs/MACHINING_DB_STRUCTURE.md          清完旧副本之后的库结构清单（19 张表 / 40 个外键列 / 还剩多少 JSON / 怎么复查）
+docs/MACHINING_CODE_LAYOUT.md 分层重构说明：分层与依赖方向、为什么这么分、兼容转发层现状、历史脚本怎么迁移
+tests/test_architecture.py  分层架构守卫（依赖只向下 / 域间零互引 / 实现模块不许依赖兼容层）
 tests/test_machining_dfm.py 机加服务测试
 run_service.py              单服务启动脚本
 ```
@@ -184,7 +233,7 @@ node tools\compare_library_pages.mjs                 # 与改造前页面结构�
 > 全部落表）。下面讲的"没打开时走 `state_json`"仍然成立——那既是回滚路径，也是别的环境
 > （如没迁过的测试库）的行为。迁移记录见「工序落表（1b）迁移」一节。
 
-`app/machining_process.py` 把工序与工序刀具行做成项目级多行表（`project_processes` /
+`app/domains/process.py` 把工序与工序刀具行做成项目级多行表（`project_processes` /
 `project_process_tools`）：行级保存、逻辑删除 + 回收站、价格快照、派生值读时算。
 
 ### 页面结构：项目 → 工序（行内选设备）→ 夹具/检具选型
@@ -210,7 +259,7 @@ node tools\compare_library_pages.mjs                 # 与改造前页面结构�
   `project_fixtures` / `project_gauges`，见下一节。
 * **基础库与工艺设置退到后台**：它们跟"这个项目的工序/选型"不是一条主线，只是维护数据。
 
-`app/machining_process.py` 把工序与工序刀具行做成项目级多行表（`project_processes` /
+`app/domains/process.py` 把工序与工序刀具行做成项目级多行表（`project_processes` /
 `project_process_tools`）：行级保存、逻辑删除 + 回收站、价格快照、派生值读时算。
 
 - **显式开关**：只有 `app_settings.project_business_version >= 1`（迁移工具写）或环境变量
@@ -263,7 +312,7 @@ node tools/smoke_machining_page.mjs                        # 冒烟：开关关�
 
 ## 问题清单落表（2a：`project_issues`，代码已就位，开关默认关）
 
-`app/machining_issue.py` 把问题清单做成项目级多行表，与 1b 同一套口径
+`app/domains/issue.py` 把问题清单做成项目级多行表，与 1b 同一套口径
 （行级读写、逻辑删除 + 回收站、图片走附件库、每次写留版本快照）。**外键全部是真的**：
 
 | 列 | 指向 | 说明 |
@@ -340,7 +389,7 @@ PUT|DELETE /api/machining-dfm/projects/{pid}/issues/{id}/photo/{slot}    # slot 
 > 逐域幂等（表里有行就跳过那一域），某一域拆不动就**整域回退**到 JSON（先把这一域这次建的行删掉），
 > 绝不出现"一半在表、一半在 JSON"。已经存在的这种项目用 `tools/catchup_project_tables.py` 补迁。
 
-`app/machining_selection.py` 把"夹具报价选型 / 检具报价选型"那两张表落库。
+`app/domains/selection.py` 把"夹具报价选型 / 检具报价选型"那两张表落库。
 口径与 1b/2a 一致（行级读写、逻辑删除 + 回收站、每次写留版本快照、派生字段不落库）。
 **一行 = 一个格子**：`(类别, 该类别在字典里的下标)`；一个类别一格，**未选型的格子也有行**
 （因为"是否报价"的勾选就存在这一行上，线上现在夹具 4 + 检具 5 = 9 格全都有值）。
@@ -391,7 +440,7 @@ GET    /api/machining-dfm/projects/{pid}/selections           # 兼容入口：�
 * **整份保存里的内联图先落成附件再做快照**：`MachiningDFMStore._materialise_inline_images()`
   在 `create()` / `update()` 落库前，把整份 state 里任何 `data:image/…;base64,…` 换成附件地址
   （按所在键决定附件分类）。否则页面上传的那张图会被写进**永久保留**的版本快照里。
-* **快照引用着的附件不许回收**：`app/machining_library.py::asset_in_snapshots()` ——
+* **快照引用着的附件不许回收**：`app/db/library.py::asset_in_snapshots()` ——
   "换图"时判定图片还有没有人用，除了扫指向 `assets(id)` 的外键列，还要看
   `project_versions.state_json` 里有没有这个附件 URL。快照永久保留（口径 1）→ 旧图也永久保留。
   （老代码没这一步：线上的第 17/18/22/26/30/34/38/40 版因此成了死链，字节不可恢复；
@@ -401,7 +450,7 @@ GET    /api/machining-dfm/projects/{pid}/selections           # 兼容入口：�
 
 ## 版本履历落表（3a：`project_versions`，代码已就位，开关默认关）
 
-`app/machining_history.py` 把**两套互不相干**的"版本"合并进一张表，用 `kind` 分开：
+`app/domains/history.py` 把**两套互不相干**的"版本"合并进一张表，用 `kind` 分开：
 
 | kind | 是什么 | 旧形态 | 谁在写 |
 | --- | --- | --- | --- |
@@ -462,7 +511,7 @@ POST   /api/machining-dfm/projects/{pid}/history/reorder             # 重排（
 
 ## 变更流水落表（3b：`project_changes`，代码已就位，开关默认关）
 
-`app/machining_changes.py` 把"**谁、什么时候、把哪一行、从什么改成什么**"记成一行流水。
+`app/domains/changes.py` 把"**谁、什么时候、把哪一行、从什么改成什么**"记成一行流水。
 流水**不是页面上某个按钮触发的**，而是**行级写入的副产物**：页面上改了哪一行，服务端就在
 **同一个事务**里记一条（和这一版的快照一起提交）——所以这一阶段前端**一个写入点都没加**，
 反而"前端零写入点"变成了验收项（界面留到阶段 4 与回收站一起做）。
@@ -577,15 +626,15 @@ GET /api/machining-dfm/projects/{pid}/changes?limit=200&entity=&action=&recycle=
 ## 基础库拆分（设备库、刀具库、夹具库、检具库已落地）
 
 四个库都不再整库存成一个 JSON 字段，也不再整表覆盖保存；
-它们共用 `app/machining_library.py` 的引擎（字段登记表 → 建表 SQL / 校验 / 两套视图 / 附件 / 迁移）：
+它们共用 `app/db/library.py` 的引擎（字段登记表 → 建表 SQL / 校验 / 两套视图 / 附件 / 迁移）：
 
 - **表结构**：`machines` 一行一台设备，字段按页面列一一对应（`brand/model/xyz/pos_acc/rep_acc/
-  rapid/tool_change/spindle_rpm/atc/price/remark`），登记表在 `app/machining_machines.py::MACHINE_FIELDS`；
+  rapid/tool_change/spindle_rpm/atc/price/remark`），登记表在 `app/domains/machines.py::MACHINE_FIELDS`；
   `tools` 一行一件刀具（`tool_group/name/category/diameter/length/spindle_rpm/feed_rate/life_minutes/price`），
-  登记表在 `app/machining_tools.py::TOOL_FIELDS`；页面自动列 `fz`/`vc` 只描述不入库；
-  `fixtures` 一行一套夹具（`center/name/price/process_days/remark`，登记表 `app/machining_fixtures.py`）、
+  登记表在 `app/domains/tools.py::TOOL_FIELDS`；页面自动列 `fz`/`vc` 只描述不入库；
+  `fixtures` 一行一套夹具（`center/name/price/process_days/remark`，登记表 `app/domains/fixtures.py`）、
   `gauges` 一行一套检具（`category/name/drawing/product_size/inspection_size/price/design_days/process_days`，
-  登记表 `app/machining_gauges.py`），键名仍是页面与成本表惯用的短键
+  登记表 `app/domains/gauges.py`），键名仍是页面与成本表惯用的短键
   （`center/mc/rmk`、`type/drw/prdSize/inspSize/price/dc/mc`）；
 - **字典表**：刀具的库分类与类型是两张独立表 `tool_groups` / `tool_categories`，
   `tools` 用文本码外键引用（`tool_group → tool_groups.code`、`category → tool_categories.code`），

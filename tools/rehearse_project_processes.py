@@ -41,7 +41,7 @@ def rehearse(work: Path) -> int:
 
     os.environ["MACHINING_PROJECT_BUSINESS"] = "1"
     from app.machining_dfm import MachiningDFMStore
-    from app.machining_process import apply_split, legacy_processes
+    from app.domains.process import apply_split, legacy_processes
 
     target = work / "machining_dfm"
     shutil.copytree(ROOT / "data" / "machining_dfm", target)

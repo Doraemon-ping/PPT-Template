@@ -1,13 +1,11 @@
-"""Binary library assets (machine photos / documents).
+"""附件库（设备照片 / 刀具图 / 夹具检具图 / 工序与问题图片 / 资料）。
 
-Design rule for this service: **records live in the database, bytes live on the
-filesystem**.  The ``assets`` table keeps only identity and metadata — ``kind``,
-``mime``, ``name``, ``size``, ``sha256`` and the relative ``path`` — so no
-library table or project snapshot ever inlines a base64 payload again.
+本服务的存储口径：**记录进数据库，字节进文件系统**。``assets`` 表只留身份与元数据——
+``kind`` / ``mime`` / ``name`` / ``size`` / ``sha256`` 与相对 ``path``，所以任何基础库表或项目
+快照都不会再内联 base64 载荷。
 
-Files are content addressed (``assets/<kind>/<sha[:2]>/<sha><ext>``) and written
-atomically, which makes re-uploading the same bytes a no-op and lets the HTTP
-layer serve them with a content-based ``ETag``.
+文件按内容寻址（``assets/<kind>/<sha[:2]>/<sha><ext>``）且原子写入：同一份字节重复上传等于
+什么都没做，HTTP 层也就能用内容 ETag 提供下载。
 """
 
 from __future__ import annotations
@@ -20,11 +18,12 @@ import re
 import tempfile
 import uuid
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 from fastapi import HTTPException
+
+from ..core.utils import stamp
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS assets(
@@ -83,10 +82,6 @@ KINDS: dict[str, tuple[dict[str, str], int, str]] = {
 }
 
 _KIND_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
-
-
-def _stamp() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def extension_for(mime: str, table: dict[str, str]) -> str:
@@ -222,7 +217,7 @@ class AssetStore:
                     except OSError:
                         pass
                     raise
-            now = _stamp()
+            now = stamp()
             record = {
                 "id": uuid.uuid4().hex,
                 "kind": kind,

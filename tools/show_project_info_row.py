@@ -22,7 +22,7 @@ except (AttributeError, ValueError):  # pragma: no cover
     pass
 
 from app.machining_dfm import MachiningDFMStore  # noqa: E402
-from app.machining_project import SETTINGS_ATTACHMENTS, SETTINGS_FIELDS  # noqa: E402
+from app.domains.project import SETTINGS_ATTACHMENTS, SETTINGS_FIELDS  # noqa: E402
 
 LIVE = BASE / "data" / "machining_dfm"
 SEED = BASE / "app" / "resources" / "machining_dfm_seed"

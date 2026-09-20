@@ -4,16 +4,16 @@
 SQL、JSON 视图、校验和旧数据迁移 —— 改一列只改一处，不再有 ``payload_json`` 大
 字段需要反解。
 
-真正的读写引擎是 ``machining_library.TypedLibrary``；本模块只声明"设备库长什么样"。
+真正的读写引擎是 ``app.db.library.TypedLibrary``；本模块只声明"设备库长什么样"。
 设备特有之处：兜底机型（``is_fallback``）、按 ``pr[].mid`` 的解析，以及删除前的
-项目引用检查（在 ``machining_dfm`` 的 store 里）。
+项目引用检查（在 ``app.services.store`` 的 store 里）。
 """
 
 from __future__ import annotations
 
 from typing import Any
 
-from .machining_library import AttachmentSpec, LibraryField, TypedLibrary
+from ..db.library import AttachmentSpec, LibraryField, TypedLibrary
 
 PHOTO_KIND = "machine_photo"
 DOC_KIND = "machine_doc"
@@ -72,6 +72,23 @@ def field_headers() -> list[dict[str, Any]]:
 def clean_values(payload: dict[str, Any], *, partial: bool = False) -> dict[str, Any]:
     """兼容旧调用名：校验一行设备输入。"""
     return MachineLibrary.clean_values(payload, partial=partial)
+
+
+def resolve_machine_ref(index: Any, machine_ids: list[str], fallback: str) -> str:
+    """旧下标引用 ``pr[].mi`` → 稳定设备 id；下标越界或不是数字就用兜底机型。
+
+    这是**历史包袱的翻译器**：早期工序里记的是"设备库第几行"（``mi`` 下标），
+    库一排序引用就错位了，所以后来改成记 id（``mid``）。老库搬迁时靠它把下标记法
+    一次性翻成 id（见 ``app/services/migrations.py`` 的 ``rewrite_process_machine_refs``），
+    读模型投影也用它兜住还没翻过来的老数据。
+    """
+    try:
+        position = int(index)
+    except (TypeError, ValueError):
+        position = -1
+    if 0 <= position < len(machine_ids):
+        return machine_ids[position]
+    return fallback
 
 
 class MachineLibrary(TypedLibrary):

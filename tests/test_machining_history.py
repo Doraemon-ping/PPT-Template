@@ -21,7 +21,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.machining_dfm import MachiningDFMStore
-from app.machining_history import (
+from app.domains.history import (
     HISTORY_TABLE,
     HISTORY_VERSION,
     KIND_HISTORY,

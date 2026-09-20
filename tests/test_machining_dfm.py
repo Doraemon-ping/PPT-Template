@@ -558,8 +558,8 @@ def test_legacy_payload_database_is_migrated(legacy_root, seed_dir):
 
 
 def test_provider_snapshot_keeps_inline_photo_and_image_slot(legacy_root, seed_dir):
-    from app.machining_projection import report_runtime
-    from app.native_forms import normalize
+    from app.services.projection import report_runtime
+    from app.services.forms import normalize
 
     store = MachiningDFMStore(legacy_root, seed_dir)
     plain = store.get("legacy-project")
@@ -577,7 +577,7 @@ def test_provider_snapshot_keeps_inline_photo_and_image_slot(legacy_root, seed_d
 
 
 def test_projection_uses_machine_id_not_position(legacy_root, seed_dir):
-    from app.machining_projection import report_runtime
+    from app.services.projection import report_runtime
 
     store = MachiningDFMStore(legacy_root, seed_dir)
     machines = store.machines.list_typed()

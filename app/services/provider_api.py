@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 
-from ..integration_contract import snapshot
+from .contract import snapshot
 
 
 def provider_router():
@@ -38,14 +38,14 @@ def install_link(app, source_id):
 
 def install_machining(app, store_factory):
     router = provider_router()
-    from ..native_forms import normalize, DFM_ADAPTER  # noqa: F401
+    from .forms import normalize, DFM_ADAPTER  # noqa: F401
 
     def check(source_id):
         if source_id != 'machining-dfm':
             raise HTTPException(404, '机加数据源不存在')
 
     def project_context(state):
-        from ..machining_projection import report_runtime
+        from .projection import report_runtime
         data, catalog = normalize(report_runtime(state), include_legacy_aliases=False)
         data.pop('runtime', None)
         return data, catalog

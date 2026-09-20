@@ -39,11 +39,10 @@ from typing import Any, Sequence
 
 from fastapi import HTTPException
 
-from .machining_library import LibraryField
-from .machining_process import _ProjectRows, _stamp, clean_json_object
-
-#: 表名
-HISTORY_TABLE = "project_versions"
+from ..core.utils import stamp
+from ..db.library import LibraryField
+from ..db.rows import ProjectRows, clean_json_object
+from ..db.tables import HISTORY_TABLE
 
 #: 阶段 3a 的能力级别：``app_settings.project_business_version`` ≥ 4 才算"版本履历已落表"
 HISTORY_VERSION = 4
@@ -95,7 +94,7 @@ LIGHT_COLUMNS = (
 )
 
 
-class ProjectVersions(_ProjectRows):
+class ProjectVersions(ProjectRows):
     """``project_versions``：一行 = 一个保存版本（``kind='save'``）或一行版本履历（``kind='history'``）。"""
 
     table = HISTORY_TABLE
@@ -180,7 +179,7 @@ class ProjectVersions(_ProjectRows):
             for order, record_id in enumerate([*wanted, *rest]):
                 conn.execute(
                     f"UPDATE {self.table} SET sort_order=?,updated=? WHERE id=?",
-                    (order, _stamp(), record_id),
+                    (order, stamp(), record_id),
                 )
         self._note_change("reorder", label=f"版本履历排序调整（{len(wanted)} 行）",
                           extra={"ids": wanted[:20]})

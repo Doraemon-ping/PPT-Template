@@ -16,12 +16,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from .machining_library import (
+from ..core.utils import stamp
+from ..db.library import (
     AttachmentSpec,
     LibraryField,
     NameDictionary,
     TypedLibrary,
-    _stamp,
 )
 
 PHOTO_KIND = "gauge_photo"
@@ -118,7 +118,7 @@ class GaugeLibrary(TypedLibrary):
         rows = db.execute(
             "SELECT id FROM gauges WHERE category=? AND deleted_at IS NULL", (category,)
         ).fetchall()
-        now = _stamp()
+        now = stamp()
         for row in rows:
             db.execute(
                 "UPDATE gauges SET deleted_at=?,deleted_by=?,deleted_reason=?,updated=? WHERE id=?",

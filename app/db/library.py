@@ -17,16 +17,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, NamedTuple
 
 from fastapi import HTTPException
 
-from .machining_assets import AssetStore
-
-
-def _stamp() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from ..core.utils import stamp
+from .assets import AssetStore
 
 
 def quote_identifier(identifier: str) -> str:
@@ -565,7 +561,7 @@ class TypedLibrary:
         self.validate_values(values, payload)
         requested = str(payload.get("id") or "").strip()[:64]
         record_id = requested or uuid.uuid4().hex
-        now = _stamp()
+        now = stamp()
         with self._connect() as db:
             existing = self.find(record_id, db=db) if requested else None
             if existing is None:
@@ -624,7 +620,7 @@ class TypedLibrary:
                 assignments = ",".join(f"{quote_identifier(column)}=?" for column in values)
                 db.execute(
                     f"UPDATE {self.table} SET {assignments},updated=? WHERE id=?",
-                    (*values.values(), _stamp(), record_id),
+                    (*values.values(), stamp(), record_id),
                 )
             if self.supports_fallback and "is_fallback" in payload:
                 if payload.get("is_fallback"):
@@ -647,7 +643,7 @@ class TypedLibrary:
             raise HTTPException(404, f"{self.table_label}记录不存在，可能已被其他管理员删除")
         if row["deleted_at"]:
             raise HTTPException(409, f"{self.table_label}记录已经在回收站里了")
-        now = _stamp()
+        now = stamp()
         with self._connect() as db:
             db.execute(
                 f"UPDATE {self.table} SET deleted_at=?,deleted_by=?,deleted_reason=?,updated=? "
@@ -677,7 +673,7 @@ class TypedLibrary:
             db.execute(
                 f"UPDATE {self.table} SET deleted_at=NULL,deleted_by=NULL,deleted_reason=NULL,updated=? "
                 "WHERE id=?",
-                (_stamp(), record_id),
+                (stamp(), record_id),
             )
         restored = self._typed(self.find(record_id))
         restored["restored_by"] = _who(by)
@@ -690,7 +686,7 @@ class TypedLibrary:
             raise HTTPException(422, f"{self.table_label}排序列表存在重复项")
         if set(ordered) != set(current):
             raise HTTPException(422, f"{self.table_label}排序必须包含全部记录且不能新增或遗漏")
-        now = _stamp()
+        now = stamp()
         with self._connect() as db:
             for index, record_id in enumerate(ordered):
                 db.execute(
@@ -751,7 +747,7 @@ class TypedLibrary:
             if spec.name_column:
                 assignments.append(f"{quote_identifier(spec.name_column)}=?")
                 payload.append(record["name"])
-            payload.extend((_stamp(), record_id))
+            payload.extend((stamp(), record_id))
             db.execute(
                 f"UPDATE {self.table} SET {','.join(assignments)},updated=? WHERE id=?", tuple(payload)
             )
@@ -769,7 +765,7 @@ class TypedLibrary:
         with self._connect() as db:
             db.execute(
                 f"UPDATE {self.table} SET {','.join(assignments)},updated=? WHERE id=?",
-                (_stamp(), record_id),
+                (stamp(), record_id),
             )
             self._release_asset(db, previous)
         return self._typed(self.find(record_id))
@@ -824,7 +820,7 @@ class TypedLibrary:
             raise HTTPException(422, f"{self.table_label}必须是对象数组")
         if len(rows) > 20_000:
             raise HTTPException(422, f"{self.table_label}超过 20000 条")
-        now = _stamp()
+        now = stamp()
         ids: list[str] = []
         with self._connect() as db:
             self.prepare_rows(db, rows)
@@ -865,7 +861,7 @@ class TypedLibrary:
         """
         if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
             raise HTTPException(422, f"{self.table_label}必须是对象数组")
-        now = _stamp()
+        now = stamp()
         inserted = updated = 0
         matched: set[str] = set()
         removed: list[dict[str, Any]] = []
@@ -1008,7 +1004,7 @@ class NameDictionary:
             str(item).strip() for item in (self.seed if names is None else names) if str(item).strip()
         ))
         added: list[str] = []
-        now = _stamp()
+        now = stamp()
         order = int(
             db.execute(f"SELECT COALESCE(MAX(sort_order), -1) + 1 FROM {self.table}").fetchone()[0]
         )
@@ -1097,7 +1093,7 @@ class NameDictionary:
                 db.execute(
                     f"UPDATE {self.table} SET deleted_at=NULL,deleted_by=NULL,deleted_reason=NULL,"
                     "updated=? WHERE name=?",
-                    (_stamp(), name),
+                    (stamp(), name),
                 )
                 revived = self._one(name)
                 revived["revived"] = True
@@ -1105,7 +1101,7 @@ class NameDictionary:
             order = int(
                 db.execute(f"SELECT COALESCE(MAX(sort_order), -1) + 1 FROM {self.table}").fetchone()[0]
             )
-            now = _stamp()
+            now = stamp()
             db.execute(
                 f"INSERT INTO {self.table}(name,sort_order,builtin,source,created,updated) "
                 "VALUES(?,?,0,'admin',?,?)",
@@ -1130,7 +1126,7 @@ class NameDictionary:
                 raise HTTPException(422, "顺序必须是整数") from None
             db.execute(
                 f"UPDATE {self.table} SET sort_order=?,updated=? WHERE name=?",
-                (order, _stamp(), name),
+                (order, stamp(), name),
             )
         return self._one(name)
 
@@ -1152,7 +1148,7 @@ class NameDictionary:
                 raise HTTPException(
                     409, f"{self.table_label}「{name}」下还有 {used} 条数据，删除需带 ?cascade=1 一起删除"
                 )
-            now = _stamp()
+            now = stamp()
             who = _who(by)
             text = str(reason or "")[:200]
             removed = 0
@@ -1193,7 +1189,7 @@ class NameDictionary:
             db.execute(
                 f"UPDATE {self.table} SET deleted_at=NULL,deleted_by=NULL,deleted_reason=NULL,updated=? "
                 "WHERE name=?",
-                (_stamp(), name),
+                (stamp(), name),
             )
         restored = self._one(name)
         restored["restored_by"] = _who(by)

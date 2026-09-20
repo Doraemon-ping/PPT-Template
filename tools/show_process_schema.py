@@ -95,7 +95,7 @@ def main() -> int:
     print("=" * 78)
     print("列 ↔ 旧键映射（接口说的还是旧短键，落库用下面这些列名）")
     print("=" * 78)
-    from app.machining_process import (
+    from app.domains.process import (
         LEGACY_PROCESS_KEYS,
         LEGACY_TOOL_KEYS,
         PROCESS_ATTACHMENTS,

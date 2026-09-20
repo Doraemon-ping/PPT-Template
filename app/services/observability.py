@@ -1,4 +1,8 @@
-"""Per-service logs and request identifiers; no business dependencies."""
+"""按服务隔离的日志与请求标识；不含任何业务依赖。
+
+日志落在 ``<DATA_DIR>/<服务名>/logs/server.log``（滚动切分），并对外提供
+``/api/logs/tail`` 与 ``/api/logs/download`` 两个只读接口，可选带鉴权钩子。
+"""
 import logging
 import time
 import uuid
@@ -8,7 +12,8 @@ from typing import Callable
 
 from fastapi import Header
 from fastapi.responses import JSONResponse, FileResponse
-from ..settings import DATA_DIR
+
+from ..core.config import DATA_DIR
 
 
 def install(app, name, guard: Callable[[str | None], None] | None = None):

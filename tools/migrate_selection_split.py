@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app.machining_dfm import MachiningDFMStore  # noqa: E402
-from app.machining_selection import (  # noqa: E402
+from app.domains.selection import (  # noqa: E402
     FIXTURE_TABLE,
     GAUGE_TABLE,
     KIND_FIXTURE,
@@ -41,7 +41,7 @@ from app.machining_selection import (  # noqa: E402
     LEGACY_SELECTION_TABLE,
     SELECTION_VERSION,
 )
-from app.machining_process import BUSINESS_VERSION_KEY  # noqa: E402
+from app.domains.process import BUSINESS_VERSION_KEY  # noqa: E402
 
 LIVE = (ROOT / "data" / "machining_dfm").resolve()
 SEED = ROOT / "app" / "resources" / "machining_dfm_seed"

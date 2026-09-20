@@ -5,6 +5,11 @@
 工作目录：`C:\Users\26257\Desktop\工作计划\6-DFM自动生成`
 
 > 后续 Agent 先读本文，再看 `docs/CHANGELOG.md` 的增量记录。本文只描述当前有效架构和边界；按日期命名的旧交接文档均为历史参考，不应覆盖本文结论。
+>
+> **⚠ 2026-09 分层重构后的代码骨架以 `docs/MACHINING_CODE_LAYOUT.md` 为准**：
+> 本文若提到 `app/machining_*.py` 这类旧扁平路径，请按该文的"旧路径 → 新路径对照表"换算
+> （`app/` 现在是 `core/ db/ domains/ services/ api/` 分层，入口是 `app/main.py:create_app()`；
+> 旧的 `app/machining_dfm.py` 与 `app/services/machining.py` 只剩兼容转发层）。
 
 ## 当前架构优先说明（2026-09-17）
 

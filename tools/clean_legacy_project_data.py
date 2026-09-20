@@ -58,10 +58,10 @@ try:
 except (AttributeError, ValueError):  # pragma: no cover
     pass
 
-from app.machining_changes import CHANGES_TABLE  # noqa: E402
+from app.domains.changes import CHANGES_TABLE  # noqa: E402
 from app.machining_dfm import PROJECT_ARRAYS, MachiningDFMStore  # noqa: E402
-from app.machining_history import HISTORY_TABLE, HISTORY_VERSION  # noqa: E402
-from app.machining_process import BUSINESS_VERSION_KEY  # noqa: E402
+from app.domains.history import HISTORY_TABLE, HISTORY_VERSION  # noqa: E402
+from app.domains.process import BUSINESS_VERSION_KEY  # noqa: E402
 
 LIVE = BASE / "data" / "machining_dfm"
 SEED = BASE / "app" / "resources" / "machining_dfm_seed"

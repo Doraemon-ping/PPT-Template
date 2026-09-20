@@ -25,11 +25,11 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-from app.machining_changes import CHANGES_TABLE, CHANGES_VERSION  # noqa: E402
-from app.machining_history import HISTORY_TABLE, HISTORY_VERSION  # noqa: E402
-from app.machining_issue import ISSUE_TABLE, ISSUE_VERSION  # noqa: E402
-from app.machining_process import BUSINESS_VERSION_KEY, PROCESS_TABLE  # noqa: E402
-from app.machining_selection import (  # noqa: E402
+from app.domains.changes import CHANGES_TABLE, CHANGES_VERSION  # noqa: E402
+from app.domains.history import HISTORY_TABLE, HISTORY_VERSION  # noqa: E402
+from app.domains.issue import ISSUE_TABLE, ISSUE_VERSION  # noqa: E402
+from app.domains.process import BUSINESS_VERSION_KEY, PROCESS_TABLE  # noqa: E402
+from app.domains.selection import (  # noqa: E402
     FIXTURE_TABLE,
     GAUGE_TABLE,
     LEGACY_SELECTION_TABLE,

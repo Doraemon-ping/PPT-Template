@@ -75,12 +75,13 @@ CHANGES_WRITE = re.compile(
 SERVER_NOTE_ACTIONS = ("create", "update", "delete", "restore", "reorder", "photo")
 
 #: 3b：五张业务表都要声明自己的"实体名"（少了哪张，那张表的改动就进不了流水）
+#: 路径是 **2026-09 分层重构后** 的：域模块从 ``app/machining_*.py`` 搬到 ``app/domains/*.py``。
 CHANGE_ENTITIES = (
-    ('machining_process.py', 'change_entity = "process"'),
-    ('machining_process.py', 'change_entity = "tool"'),
-    ('machining_issue.py', 'change_entity = "issue"'),
-    ('machining_selection.py', 'change_entity = "selection"'),
-    ('machining_history.py', 'change_entity = "history"'),
+    ('domains/process.py', 'change_entity = "process"'),
+    ('domains/process.py', 'change_entity = "tool"'),
+    ('domains/issue.py', 'change_entity = "issue"'),
+    ('domains/selection.py', 'change_entity = "selection"'),
+    ('domains/history.py', 'change_entity = "history"'),
 )
 
 
@@ -211,7 +212,13 @@ def main() -> int:
         if hit:
             problems.append(f"{page.name} 里有写变更流水的代码：{hit.group(0)[:60]}")
     # 5.2 服务端：引擎里六种动作都记、五张表都自报了实体名
-    process_source = (ROOT / "app" / "machining_process.py").read_text(encoding="utf-8")
+    # （路径按 2026-09 分层重构后的位置；``app/`` 下现在是 core/db/domains/services/api 分层。
+    #   ``create`` / ``photo`` 两个动作记流水的代码在公共基类 ``app/db/rows.py::ProjectRows`` 里，
+    #   工序/刀具行只覆写了 ``update`` / ``delete`` / ``restore`` / ``reorder``，所以两处都要读。）
+    process_source = "".join(
+        (ROOT / "app" / part).read_text(encoding="utf-8")
+        for part in ("db/rows.py", "domains/process.py")
+    )
     for action in SERVER_NOTE_ACTIONS:
         ok = f'_note_change("{action}"' in process_source
         print(f"  {'√' if ok else '×'} 引擎：{action} 记流水（_note_change(\"{action}\")）")
@@ -223,7 +230,12 @@ def main() -> int:
         print(f"  {'√' if ok else '×'} {filename}：{snippet}")
         if not ok:
             problems.append(f"{filename} 里缺少 {snippet}")
-    routes = (ROOT / "app" / "machining_dfm.py").read_text(encoding="utf-8")
+    # 服务端代码 = 组合根 store + 迁移 + 全部路由模块
+    # （2026-09 分层重构前这全在一个 app/machining_dfm.py 里，所以合成一个字符串来查）
+    server_parts = [(ROOT / "app" / "services" / "store.py"),
+                    (ROOT / "app" / "services" / "migrations.py")]
+    server_parts += sorted((ROOT / "app" / "api" / "routers").glob("*.py"))
+    routes = "".join(part.read_text(encoding="utf-8") for part in server_parts)
     ok = 'def list_project_changes' in routes and "/changes\")" in routes
     print(f"  {'√' if ok else '×'} 服务端提供只读清单 GET /projects/{'{project_id}'}/changes")
     if not ok:

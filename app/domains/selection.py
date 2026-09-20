@@ -51,18 +51,14 @@ from typing import Any, Sequence
 
 from fastapi import HTTPException
 
-from .machining_library import LibraryField
-from .machining_process import ForeignKey, _ProjectRows, _stamp
+from ..core.utils import stamp
+from ..db.library import LibraryField
+from ..db.rows import ForeignKey, ProjectRows
+#: 夹具选型表 / 检具选型表 / 老多态表：表名登记在 db 层，本模块只做业务声明
+from ..db.tables import FIXTURE_TABLE, GAUGE_TABLE, LEGACY_SELECTION_TABLE
 
 #: 能力级别（1 = 工序，2 = 问题清单，3 = 选型报价）
 SELECTION_VERSION = 3
-
-#: 夹具选型表：一个项目 × 一个模具中心 = 一行
-FIXTURE_TABLE = "project_fixtures"
-#: 检具选型表：一个项目 × 一个检具类别 = 一行
-GAUGE_TABLE = "project_gauges"
-#: 老的多态表：**只作为迁移来源**，代码不再读写它
-LEGACY_SELECTION_TABLE = "project_selections"
 
 KIND_FIXTURE = "fixture"
 KIND_GAUGE = "gauge"
@@ -170,7 +166,7 @@ SELECTION_ARRAY_KEYS = ("fixQ", "fixQC", "insp", "inspQ")
 SELECTION_TABLE_NAMES = (FIXTURE_TABLE, GAUGE_TABLE)
 
 
-class _SelectionRows(_ProjectRows):
+class _SelectionRows(ProjectRows):
     """一类选型的项目级表：``(项目, 类别)`` 一行，``sort_order`` = 页面上的格子下标。"""
 
     kind = ""
@@ -826,7 +822,7 @@ def selection_listing(
             "quoted": len(quoted),
             "price": round(sum(entry["price"] for entry in quoted), 4),
         },
-        "updated": _stamp(),
+        "updated": stamp(),
     }
 
 
@@ -858,5 +854,5 @@ def selections_listing(
         "tables": {kind: KIND_SPECS[kind].table for kind in SELECTION_KINDS},
         "fields": [field.describe() for field in SELECTION_FIELDS],
         "rows": rows,
-        "updated": _stamp(),
+        "updated": stamp(),
     }

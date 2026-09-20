@@ -17,7 +17,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.machining_dfm import MachiningDFMStore
-from app.machining_issue import (
+from app.domains.issue import (
     ISSUE_ATTACHMENTS,
     ISSUE_TABLE,
     apply_issue_split,
@@ -76,7 +76,7 @@ def pid_of(store) -> str:
 
 def seed_processes(store, state=None) -> str:
     """先把工序落表（问题清单的外键指向它），返回项目 id。"""
-    from app.machining_process import apply_split
+    from app.domains.process import apply_split
 
     pid = pid_of(store)
     state = state or store.get(pid)["state"]

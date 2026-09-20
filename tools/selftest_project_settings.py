@@ -12,8 +12,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
-from app.machining_assets import AssetStore  # noqa: E402
-from app.machining_project import ProjectSettings  # noqa: E402
+from app.db.assets import AssetStore  # noqa: E402
+from app.domains.project import ProjectSettings  # noqa: E402
 
 root = Path(tempfile.mkdtemp(prefix="project-settings-"))
 db_path = root / "t.sqlite3"

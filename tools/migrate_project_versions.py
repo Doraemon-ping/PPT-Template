@@ -59,7 +59,7 @@ except (AttributeError, ValueError):  # pragma: no cover - 老解释器/被重�
     pass
 
 from app.machining_dfm import MachiningDFMStore  # noqa: E402
-from app.machining_history import (  # noqa: E402
+from app.domains.history import (  # noqa: E402
     HISTORY_TABLE,
     HISTORY_VERSION,
     apply_history_split,
@@ -67,8 +67,8 @@ from app.machining_history import (  # noqa: E402
     legacy_history,
     version_listing,
 )
-from app.machining_process import BUSINESS_VERSION_KEY  # noqa: E402
-from app.machining_selection import SELECTION_VERSION  # noqa: E402
+from app.domains.process import BUSINESS_VERSION_KEY  # noqa: E402
+from app.domains.selection import SELECTION_VERSION  # noqa: E402
 
 LIVE = BASE / "data" / "machining_dfm"
 SEED = BASE / "app" / "resources" / "machining_dfm_seed"

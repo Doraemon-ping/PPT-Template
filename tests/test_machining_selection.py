@@ -21,7 +21,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.machining_dfm import MachiningDFMStore
-from app.machining_selection import (
+from app.domains.selection import (
     FIXTURE_TABLE,
     GAUGE_TABLE,
     KIND_FIXTURE,
@@ -573,7 +573,7 @@ def test_legacy_polymorphic_rows_are_copied_by_kind(store):
         legacy = [dict(row) for row in db.execute(
             "SELECT * FROM project_selections WHERE project_id=?", (pid,))]
 
-    from app.machining_selection import copy_legacy_rows
+    from app.domains.selection import copy_legacy_rows
 
     report = copy_legacy_rows(store.selections, pid, legacy)
     assert report["rows"] == 2

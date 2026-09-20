@@ -79,7 +79,7 @@ for slot in ('product2', 'blank_insp', 'product'):
 
 print('\n=== 直接调用 store，抓 traceback ===')
 from app.machining_dfm import MachiningDFMStore                         # noqa: E402
-from app.settings import BASE_DIR, DATA_DIR                            # noqa: E402
+from app.core.config import BASE_DIR, DATA_DIR                            # noqa: E402
 store = MachiningDFMStore(DATA_DIR / 'machining_dfm', BASE_DIR / 'app/resources/machining_dfm_seed')
 PID4 = (lambda r: (r.get('project') or r)['id'])(client.post(
     API + '/projects', json={'name': 'traceback', 'state': {'G': {}, 'pr': [], 'is': []}}, headers=H).json())

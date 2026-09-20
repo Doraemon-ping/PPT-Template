@@ -16,9 +16,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from .machining_library import (
+from ..core.utils import stamp
+from ..db.library import (
     AttachmentSpec,
-    _stamp,
     LibraryField,
     NameDictionary,
     TypedLibrary,
@@ -116,7 +116,7 @@ class FixtureLibrary(TypedLibrary):
         rows = db.execute(
             "SELECT id FROM fixtures WHERE center=? AND deleted_at IS NULL", (center,)
         ).fetchall()
-        now = _stamp()
+        now = stamp()
         for row in rows:
             db.execute(
                 "UPDATE fixtures SET deleted_at=?,deleted_by=?,deleted_reason=?,updated=? WHERE id=?",

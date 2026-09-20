@@ -18,7 +18,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.machining_dfm import MachiningDFMStore
-from app.machining_process import (
+from app.domains.process import (
     BUSINESS_VERSION_KEY,
     NC_DEFAULTS,
     apply_split,
@@ -26,7 +26,7 @@ from app.machining_process import (
     legacy_processes,
     split_state,
 )
-from app.machining_selection import SELECTION_ARRAY_KEYS, legacy_selection_arrays
+from app.domains.selection import SELECTION_ARRAY_KEYS, legacy_selection_arrays
 
 PROCESS_WITH_TOOLS = {
     # 键序与线上 state_json 完全一致（逐字节比对的基准）
@@ -102,7 +102,7 @@ def seed_rows(store, state=None) -> tuple[str, dict]:
     """
     pid = project_id(store)
     state = state or store.get(pid)["state"]
-    from app.machining_process import apply_split
+    from app.domains.process import apply_split
 
     for tool in TOOL_LIBRARY:                      # 把合成刀具库灌进真表（同 id）
         if store.tools.find(tool["id"]) is None:
@@ -398,7 +398,7 @@ def test_split_reports_ambiguous_and_missing_tools(business_store):
         {"id": "x1", "tp": "重名刀", "d": 10, "price": 0.0, "life": 0.0},
         {"id": "x2", "tp": "重名刀", "d": 10, "price": 0.0, "life": 0.0},
     ]
-    from app.machining_process import apply_split
+    from app.domains.process import apply_split
 
     pid = project_id(business_store)
     report = apply_split(business_store.processes, business_store.process_tools, pid, state,
@@ -419,7 +419,7 @@ def test_split_disambiguates_duplicate_names_by_diameter(business_store):
     ]
     for row in library:          # 外键要求库里真有这两行
         business_store.tools.create(dict(row))
-    from app.machining_process import apply_split
+    from app.domains.process import apply_split
 
     pid = project_id(business_store)
     report = apply_split(business_store.processes, business_store.process_tools, pid, state,

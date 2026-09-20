@@ -53,7 +53,7 @@ project_id       → projects(id)            NO ACTION
 
 ## 只记一次：流水与保存版本同生共死
 
-行级写入（引擎 ``_ProjectRows``）**不直接写这张表**，而是把一个"草稿"交给 store；
+行级写入（引擎 ``app.db.rows.ProjectRows``）**不直接写这张表**，而是把一个"草稿"交给 store；
 store 在 ``_bump_project`` 的写事务里（已经拿到新版本号、也写好了 ``kind='save'`` 行）
 才把草稿落库并挂上 ``version_id``。所以：
 
@@ -73,11 +73,18 @@ from __future__ import annotations
 import json
 from typing import Any, Sequence
 
-from .machining_library import LibraryField
-from .machining_process import ForeignKey, _ProjectRows, _stamp, clean_json_object
-
-#: 表名
-CHANGES_TABLE = "project_changes"
+from ..core.utils import stamp
+from ..db.library import LibraryField
+from ..db.rows import ForeignKey, ProjectRows, clean_json_object
+from ..db.tables import (
+    CHANGES_TABLE,
+    FIXTURE_TABLE,
+    GAUGE_TABLE,
+    HISTORY_TABLE,
+    ISSUE_TABLE,
+    PROCESS_TABLE,
+    PROCESS_TOOL_TABLE,
+)
 
 #: 阶段 3b 的能力级别：``app_settings.project_business_version`` ≥ 5 才算"变更流水已落表"
 CHANGES_VERSION = 5
@@ -159,13 +166,13 @@ CHANGES_JSON_COLUMNS = {"extra": "extra_json"}
 #: 新库连那张表都不建（写它等于写一个指不到的表）。老库上这一列还在、外键也还在，
 #: 只用来给历史流水行指路；新行一律不写它，改由下面两列分列指向夹具/检具表。
 CHANGES_FOREIGN_KEYS = (
-    ForeignKey("version_id", "project_versions", on_delete="SET NULL"),
-    ForeignKey("process_row_id", "project_processes", on_delete="SET NULL"),
-    ForeignKey("tool_row_id", "project_process_tools", on_delete="SET NULL"),
-    ForeignKey("issue_row_id", "project_issues", on_delete="SET NULL"),
-    ForeignKey("fixture_row_id", "project_fixtures", on_delete="SET NULL"),
-    ForeignKey("gauge_row_id", "project_gauges", on_delete="SET NULL"),
-    ForeignKey("history_row_id", "project_versions", on_delete="SET NULL"),
+    ForeignKey("version_id", HISTORY_TABLE, on_delete="SET NULL"),
+    ForeignKey("process_row_id", PROCESS_TABLE, on_delete="SET NULL"),
+    ForeignKey("tool_row_id", PROCESS_TOOL_TABLE, on_delete="SET NULL"),
+    ForeignKey("issue_row_id", ISSUE_TABLE, on_delete="SET NULL"),
+    ForeignKey("fixture_row_id", FIXTURE_TABLE, on_delete="SET NULL"),
+    ForeignKey("gauge_row_id", GAUGE_TABLE, on_delete="SET NULL"),
+    ForeignKey("history_row_id", HISTORY_TABLE, on_delete="SET NULL"),
 )
 
 #: 老库遗留列：新库里只留一个**可空**列（没有外键），历史流水行仍读得到当时挂的是哪一行
@@ -176,8 +183,8 @@ SELECTION_KIND_COLUMNS = {"fixture": "fixture_row_id", "gauge": "gauge_row_id"}
 
 #: 老库补列用：这几列是后加的，老库上要用 ``ALTER TABLE ADD COLUMN`` 补（可空 + REFERENCES）
 LATE_COLUMNS = (
-    "fixture_row_id TEXT REFERENCES project_fixtures(id) ON DELETE SET NULL",
-    "gauge_row_id TEXT REFERENCES project_gauges(id) ON DELETE SET NULL",
+    f"fixture_row_id TEXT REFERENCES {FIXTURE_TABLE}(id) ON DELETE SET NULL",
+    f"gauge_row_id TEXT REFERENCES {GAUGE_TABLE}(id) ON DELETE SET NULL",
 )
 
 #: 五个"被改的行"列全空
@@ -217,7 +224,7 @@ LIST_COLUMNS = (
 )
 
 
-class ProjectChanges(_ProjectRows):
+class ProjectChanges(ProjectRows):
     """``project_changes``：一行 = 一次改动里的一个实体（追加型日志）。"""
 
     table = CHANGES_TABLE
@@ -274,7 +281,7 @@ class ProjectChanges(_ProjectRows):
         "record_id": "...", "extra": {...}}``；``entity`` 不认识的行**不插**（宁可少记，
         也不插一条挂不上外键的烂行）。
         """
-        stamp = created or _stamp()
+        created_at = created or stamp()
         order = self.next_order(db, project_id)
         written: list[str] = []
         for draft in drafts:
@@ -296,8 +303,8 @@ class ProjectChanges(_ProjectRows):
                 "deleted_at": None,
                 "deleted_by": "",
                 "deleted_reason": "",
-                "created": stamp,
-                "updated": stamp,
+                "created": created_at,
+                "updated": created_at,
             }
             for name, column in ENTITY_COLUMNS.items():
                 # 选型**不走** selection_row_id（它指的老表在新库里根本不存在）：
@@ -331,7 +338,7 @@ class ProjectChanges(_ProjectRows):
         sql = (
             f"SELECT c.{', c.'.join(LIST_COLUMNS)}, v.revision AS version_revision, "
             "v.name AS version_name FROM project_changes c "
-            "LEFT JOIN project_versions v ON v.id = c.version_id "
+            f"LEFT JOIN {HISTORY_TABLE} v ON v.id = c.version_id "
             "WHERE c.project_id=?"
         )
         params: list[Any] = [project_id]

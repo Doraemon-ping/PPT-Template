@@ -17,7 +17,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.machining_dfm import CHANGES_VERSION, MachiningDFMStore
-from app.machining_history import HISTORY_TABLE, KIND_SAVE
+from app.domains.history import HISTORY_TABLE, KIND_SAVE
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -57,7 +57,7 @@ def pid_of(store) -> str:
 
 def migrate(store) -> str:
     """把种子项目按迁移工具的方式落表（工序/刀具行/问题清单），返回项目 id。"""
-    from app.machining_process import apply_split
+    from app.domains.process import apply_split
 
     pid = pid_of(store)
     state = store.get(pid)["state"]

@@ -83,9 +83,11 @@ print('\nassets 表上以 kind 去重的键（同一 kind 才会共用同一行�
 print('   ', q('select kind, count(*) from assets group by kind'))
 print('\n各附件列的 kind 定义：')
 import re
-src = open('app/machining_project.py', encoding='utf-8').read()
+# 2026-09 分层重构后路径：app/machining_project.py → app/domains/project.py
+src = open('app/domains/project.py', encoding='utf-8').read()
 for m in re.finditer(r'AttachmentSpec\(([^)]*)\)', src, re.S):
     print('   ', ' '.join(m.group(1).split())[:150])
-src2 = open('app/machining_issue.py', encoding='utf-8').read()
+# app/machining_issue.py → app/domains/issue.py
+src2 = open('app/domains/issue.py', encoding='utf-8').read()
 for m in re.finditer(r'AttachmentSpec\(([^)]*)\)', src2, re.S):
     print('   issue:', ' '.join(m.group(1).split())[:150])

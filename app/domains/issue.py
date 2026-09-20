@@ -27,15 +27,13 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from .machining_library import AttachmentSpec, LibraryField
-from .machining_process import (
-    PROCESS_TABLE,
-    _ProjectRows,
-    _asset_value,
+from ..db.library import AttachmentSpec, LibraryField
+from ..db.rows import (
+    ProjectRows,
+    asset_value,
     clean_json_object,
 )
-
-ISSUE_TABLE = "project_issues"
+from ..db.tables import ISSUE_TABLE, PROCESS_TABLE
 
 #: 阶段 2 的版本号：``app_settings.project_business_version`` ≥ 2 才算"问题清单已落表"
 ISSUE_VERSION = 2
@@ -64,7 +62,7 @@ ISSUE_ATTACHMENTS: tuple[AttachmentSpec, ...] = (
 )
 
 
-class ProjectIssues(_ProjectRows):
+class ProjectIssues(ProjectRows):
     """``project_issues``：一个问题一行（表标签给报错用）。"""
 
     table = ISSUE_TABLE
@@ -115,8 +113,8 @@ def compose_issues(
             "fx": str(row.get("fx") or ""),
             "cr": str(row.get("cr") or ""),
             "st": str(row.get("st") or "进行中"),
-            "bI": _asset_value(asset_store, row.get("before_photo_id"), inline_assets),
-            "aI": _asset_value(asset_store, row.get("after_photo_id"), inline_assets),
+            "bI": asset_value(asset_store, row.get("before_photo_id"), inline_assets),
+            "aI": asset_value(asset_store, row.get("after_photo_id"), inline_assets),
         }
         for key, value in extra.items():
             item.setdefault(str(key), value)

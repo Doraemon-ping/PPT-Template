@@ -51,14 +51,14 @@ except (AttributeError, ValueError):  # pragma: no cover - 老解释器/被重�
     pass
 
 from app.machining_dfm import MachiningDFMStore  # noqa: E402
-from app.machining_issue import (  # noqa: E402
+from app.domains.issue import (  # noqa: E402
     ISSUE_TABLE,
     ISSUE_VERSION,
     apply_issue_split,
     legacy_issues,
 )
-from app.machining_process import BUSINESS_VERSION, BUSINESS_VERSION_KEY  # noqa: E402
-from app.machining_selection import (  # noqa: E402
+from app.domains.process import BUSINESS_VERSION, BUSINESS_VERSION_KEY  # noqa: E402
+from app.domains.selection import (  # noqa: E402
     FIXTURE_TABLE,
     GAUGE_TABLE,
     LEGACY_SELECTION_TABLE,
@@ -429,7 +429,7 @@ def migrate(root: Path, *, apply: bool, keep: bool) -> int:
                 problems.append(f"项目 {payload['name']}：工序行数 {payload['process_count']} → {got}")
             # "表是唯一权威"要证明，但**不能**在线上库上动手：
             # 直接问一句"光凭两张表能不能还原出迁移前的 pr"就够了。
-            from app.machining_process import legacy_processes
+            from app.domains.process import legacy_processes
 
             from_tables = legacy_processes(
                 reopened.processes, reopened.process_tools, project_id,
@@ -585,7 +585,7 @@ def migrate(root: Path, *, apply: bool, keep: bool) -> int:
 
 def apply_split_safe(store: MachiningDFMStore, project_id: str, payload: dict) -> dict:
     """拆表：刀具库/设备库用**读模型**里的（state_json 里没有库）。"""
-    from app.machining_process import apply_split
+    from app.domains.process import apply_split
 
     return apply_split(
         store.processes, store.process_tools, project_id, payload["state"],

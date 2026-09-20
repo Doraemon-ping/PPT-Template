@@ -1,0 +1,697 @@
+[
+ {
+  "method": "GET",
+  "path": "/",
+  "name": "home"
+ },
+ {
+  "method": "GET",
+  "path": "/api/integration/services",
+  "name": "service_links"
+ },
+ {
+  "method": "GET",
+  "path": "/api/integration/workbench-link",
+  "name": "workbench_link"
+ },
+ {
+  "method": "GET",
+  "path": "/api/logs/download",
+  "name": "download"
+ },
+ {
+  "method": "GET",
+  "path": "/api/logs/tail",
+  "name": "tail"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/assets/{asset_id}",
+  "name": "get_asset"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/auth/login",
+  "name": "login"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/auth/password",
+  "name": "change_password"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/bootstrap",
+  "name": "bootstrap"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/config",
+  "name": "get_config"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/config",
+  "name": "update_config"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/defaults",
+  "name": "project_defaults"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/fixture-centers",
+  "name": "list_fixture-centers"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/fixture-centers",
+  "name": "create_fixture-centers"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/fixture-centers/{item}",
+  "name": "delete_fixture-centers"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/fixture-centers/{item}",
+  "name": "update_fixture-centers"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/fixtures",
+  "name": "list_fixtures"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/fixtures",
+  "name": "create_fixtures"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/fixtures/fields",
+  "name": "fixtures_fields"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/fixtures/reorder",
+  "name": "reorder_fixtures"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/fixtures/{row_id}",
+  "name": "delete_fixtures"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/fixtures/{row_id}",
+  "name": "update_fixtures"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/fixtures/{row_id}/photo",
+  "name": "clear_fixtures_photo"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/fixtures/{row_id}/photo",
+  "name": "upload_fixtures_photo"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/gauge-categories",
+  "name": "list_gauge-categories"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/gauge-categories",
+  "name": "create_gauge-categories"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/gauge-categories/{item}",
+  "name": "delete_gauge-categories"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/gauge-categories/{item}",
+  "name": "update_gauge-categories"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/gauges",
+  "name": "list_gauges"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/gauges",
+  "name": "create_gauges"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/gauges/fields",
+  "name": "gauges_fields"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/gauges/reorder",
+  "name": "reorder_gauges"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/gauges/{row_id}",
+  "name": "delete_gauges"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/gauges/{row_id}",
+  "name": "update_gauges"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/gauges/{row_id}/photo",
+  "name": "clear_gauges_photo"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/gauges/{row_id}/photo",
+  "name": "upload_gauges_photo"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/libraries",
+  "name": "get_libraries"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/libraries",
+  "name": "update_libraries"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/library-dictionaries",
+  "name": "library_dictionaries"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/machines",
+  "name": "list_machines"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/machines",
+  "name": "create_machine"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/machines/fields",
+  "name": "machine_fields"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/machines/reorder",
+  "name": "reorder_machines"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/machines/{machine_id}",
+  "name": "delete_machine"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/machines/{machine_id}",
+  "name": "update_machine"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/machines/{machine_id}/default",
+  "name": "set_default_machine"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/machines/{machine_id}/doc",
+  "name": "delete_machine_doc"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/machines/{machine_id}/doc",
+  "name": "upload_machine_doc"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/machines/{machine_id}/photo",
+  "name": "delete_machine_photo"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/machines/{machine_id}/photo",
+  "name": "upload_machine_photo"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/project-settings/fields",
+  "name": "project_settings_fields"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects",
+  "name": "list_projects"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects",
+  "name": "create_project"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}",
+  "name": "delete_project"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}",
+  "name": "get_project"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/projects/{project_id}",
+  "name": "update_project"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/archive",
+  "name": "archive_project"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/changes",
+  "name": "list_project_changes"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/export.zip",
+  "name": "export_project_package"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/fixtures",
+  "name": "list_selection"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/fixtures/{slot}",
+  "name": "delete_selection"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/projects/{project_id}/fixtures/{slot}",
+  "name": "patch_selection"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/projects/{project_id}/fixtures/{slot}",
+  "name": "put_selection"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/gauges",
+  "name": "list_selection"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/gauges/{slot}",
+  "name": "delete_selection"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/projects/{project_id}/gauges/{slot}",
+  "name": "patch_selection"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/projects/{project_id}/gauges/{slot}",
+  "name": "put_selection"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/history",
+  "name": "list_project_history"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/history",
+  "name": "create_project_history"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/history/reorder",
+  "name": "reorder_project_history"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/history/{record_id}",
+  "name": "delete_project_history"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/projects/{project_id}/history/{record_id}",
+  "name": "patch_project_history"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/history/{record_id}/restore",
+  "name": "restore_project_history"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/issues",
+  "name": "list_project_issues"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/issues",
+  "name": "create_project_issue"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/issues/reorder",
+  "name": "reorder_project_issues"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/issues/{issue_id}",
+  "name": "delete_project_issue"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/projects/{project_id}/issues/{issue_id}",
+  "name": "patch_project_issue"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/issues/{issue_id}/photo/{slot}",
+  "name": "delete_issue_photo"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/projects/{project_id}/issues/{issue_id}/photo/{slot}",
+  "name": "upload_issue_photo"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/issues/{issue_id}/restore",
+  "name": "restore_project_issue"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/photos/{slot}",
+  "name": "delete_project_photo"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/projects/{project_id}/photos/{slot}",
+  "name": "upload_project_photo"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/processes",
+  "name": "list_project_processes"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/processes",
+  "name": "create_project_process"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/processes/reorder",
+  "name": "reorder_project_processes"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/processes/{process_id}",
+  "name": "delete_project_process"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/projects/{project_id}/processes/{process_id}",
+  "name": "patch_project_process"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/processes/{process_id}/machine",
+  "name": "clear_project_process_machine"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/projects/{project_id}/processes/{process_id}/machine",
+  "name": "set_project_process_machine"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/processes/{process_id}/photo",
+  "name": "delete_process_photo"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/projects/{project_id}/processes/{process_id}/photo",
+  "name": "upload_process_photo"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/processes/{process_id}/restore",
+  "name": "restore_project_process"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/processes/{process_id}/tools",
+  "name": "create_project_tool"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/processes/{process_id}/tools/reorder",
+  "name": "reorder_project_tools"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/restore",
+  "name": "restore_project"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/selections",
+  "name": "list_project_selections"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/settings",
+  "name": "get_project_settings"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/projects/{project_id}/settings",
+  "name": "patch_project_settings"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/projects/{project_id}/settings",
+  "name": "put_project_settings"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/tools/{tool_id}",
+  "name": "delete_project_tool"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/projects/{project_id}/tools/{tool_id}",
+  "name": "patch_project_tool"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/projects/{project_id}/tools/{tool_id}/photo",
+  "name": "delete_tool_photo"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/projects/{project_id}/tools/{tool_id}/photo",
+  "name": "upload_tool_photo"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/projects/{project_id}/tools/{tool_id}/restore",
+  "name": "restore_project_tool"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/trash",
+  "name": "project_trash"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/projects/{project_id}/versions",
+  "name": "project_versions"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/tool-categories",
+  "name": "create_tool_category"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/tool-categories/{code}",
+  "name": "delete_tool_category"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/tool-categories/{code}",
+  "name": "update_tool_category"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/tool-dictionaries",
+  "name": "tool_dictionaries"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/tool-groups",
+  "name": "create_tool_group"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/tool-groups/{code}",
+  "name": "delete_tool_group"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/tool-groups/{code}",
+  "name": "update_tool_group"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/tools",
+  "name": "list_tools"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/tools",
+  "name": "create_tool"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/tools/fields",
+  "name": "tool_fields"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/tools/reorder",
+  "name": "reorder_tools"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/tools/{tool_id}",
+  "name": "delete_tool"
+ },
+ {
+  "method": "PATCH",
+  "path": "/api/machining-dfm/tools/{tool_id}",
+  "name": "update_tool"
+ },
+ {
+  "method": "DELETE",
+  "path": "/api/machining-dfm/tools/{tool_id}/photo",
+  "name": "delete_tool_photo"
+ },
+ {
+  "method": "PUT",
+  "path": "/api/machining-dfm/tools/{tool_id}/photo",
+  "name": "upload_tool_photo"
+ },
+ {
+  "method": "GET",
+  "path": "/api/machining-dfm/trash",
+  "name": "library_trash"
+ },
+ {
+  "method": "POST",
+  "path": "/api/machining-dfm/trash/{table}/{record_id}/restore",
+  "name": "restore_trash_row"
+ },
+ {
+  "method": "GET",
+  "path": "/api/ppt-provider/v1/sources",
+  "name": "sources"
+ },
+ {
+  "method": "POST",
+  "path": "/api/ppt-provider/v1/sources/{source_id}/normalize",
+  "name": "normalize_data"
+ },
+ {
+  "method": "GET",
+  "path": "/api/ppt-provider/v1/sources/{source_id}/projects",
+  "name": "projects"
+ },
+ {
+  "method": "GET",
+  "path": "/api/ppt-provider/v1/sources/{source_id}/projects/{project_id}/snapshot",
+  "name": "get_snapshot"
+ },
+ {
+  "method": "GET",
+  "path": "/docs",
+  "name": "swagger_ui_html"
+ },
+ {
+  "method": "HEAD",
+  "path": "/docs",
+  "name": "swagger_ui_html"
+ },
+ {
+  "method": "GET",
+  "path": "/docs/oauth2-redirect",
+  "name": "swagger_ui_redirect"
+ },
+ {
+  "method": "HEAD",
+  "path": "/docs/oauth2-redirect",
+  "name": "swagger_ui_redirect"
+ },
+ {
+  "method": "GET",
+  "path": "/health",
+  "name": "health"
+ },
+ {
+  "method": "GET",
+  "path": "/machining-dfm",
+  "name": "machining_dfm_page"
+ },
+ {
+  "method": "GET",
+  "path": "/openapi.json",
+  "name": "openapi"
+ },
+ {
+  "method": "HEAD",
+  "path": "/openapi.json",
+  "name": "openapi"
+ },
+ {
+  "method": "GET",
+  "path": "/redoc",
+  "name": "redoc_html"
+ },
+ {
+  "method": "HEAD",
+  "path": "/redoc",
+  "name": "redoc_html"
+ },
+ {
+  "method": "",
+  "path": "/static",
+  "name": "static"
+ }
+]

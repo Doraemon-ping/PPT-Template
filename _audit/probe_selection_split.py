@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app.machining_dfm import LEGACY_SELECTION_TABLE, MachiningDFMStore  # noqa: E402
-from app.machining_selection import (  # noqa: E402
+from app.domains.selection import (  # noqa: E402
     FIXTURE_TABLE,
     GAUGE_TABLE,
     KIND_FIXTURE,

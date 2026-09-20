@@ -1,6 +1,6 @@
 """项目级业务数据（本轮：项目信息 ``project_settings``）。
 
-与基础库共用同一套"字段登记表"思路（``app/machining_library.py``）：
+与基础库共用同一套"字段登记表"思路（``app/db/library.py``）：
 
 * 页面上一个字段 = 一个 ``LibraryField``：同时决定建表列、JSON 键、校验规则与旧数据迁移；
 * ``project_settings`` 是 **1:1** 表（主键 ``project_id``），一个项目一行，**每个项目存自己的数据**；
@@ -21,16 +21,15 @@ from typing import Any, Iterable
 
 from fastapi import HTTPException
 
-from .machining_library import (
+from ..core.utils import stamp
+from ..db.library import (
     AttachmentSpec,
     LibraryField,
     TypedLibrary,
-    _stamp,
     asset_used_elsewhere,
     quote_identifier,
 )
-
-SETTINGS_TABLE = "project_settings"
+from ..db.tables import SETTINGS_TABLE
 
 #: 项目信息字段（顺序即页面顺序；``label`` 与页面 ``bSetup``/``bSettings`` 一致）
 SETTINGS_FIELDS: tuple[LibraryField, ...] = (
@@ -161,7 +160,7 @@ class ProjectSettings(TypedLibrary):
         row = self.find(project_id, db=db)
         if row is not None:
             return row
-        now = _stamp()
+        now = stamp()
         columns = self.insert_columns
         payload = [project_id, *self._defaults(), "{}", None, "", "", now, now]
         with self.assets.session(db) as conn:
@@ -352,7 +351,7 @@ class ProjectSettings(TypedLibrary):
             assignments.append("extra_json=?")
             params.append(json.dumps(merged_extra, ensure_ascii=False, separators=(",", ":")))
             assignments.append("updated=?")
-            params.append(_stamp())
+            params.append(stamp())
             params.append(project_id)
             conn.execute(
                 f"UPDATE {self.table} SET " + ",".join(assignments) + f" WHERE {self.key_column}=?",
@@ -402,7 +401,7 @@ class ProjectSettings(TypedLibrary):
             db.execute(
                 f"UPDATE {self.table} SET {quote_identifier(spec.column)}=?,updated=? "
                 f"WHERE {self.key_column}=?",
-                (asset_id, _stamp(), project_id),
+                (asset_id, stamp(), project_id),
             )
             if previous and previous != asset_id:
                 self._release_asset(db, previous, skip=project_id, skip_column=spec.column)

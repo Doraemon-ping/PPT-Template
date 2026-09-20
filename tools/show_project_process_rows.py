@@ -29,7 +29,7 @@ except (AttributeError, ValueError):  # pragma: no cover
     pass
 
 from app.machining_dfm import MachiningDFMStore  # noqa: E402
-from app.machining_process import (  # noqa: E402
+from app.domains.process import (  # noqa: E402
     NC_KEYS,
     PROCESS_ATTACHMENTS,
     PROCESS_FIELDS,
@@ -100,7 +100,7 @@ def main() -> int:
             print("这个版本里没有工序。\n")
             continue
 
-        from app.machining_process import apply_split
+        from app.domains.process import apply_split
 
         report = apply_split(store.processes, store.process_tools, pid, state,
                              tools_library=library, machines=machines)
@@ -207,7 +207,7 @@ def main() -> int:
             print()
 
         # ---------------- 反证：表单独能还原旧 pr ----------------
-        from app.machining_process import legacy_processes
+        from app.domains.process import legacy_processes
 
         rebuilt = legacy_processes(store.processes, store.process_tools, pid,
                                    asset_store=store.assets, inline_assets=False)

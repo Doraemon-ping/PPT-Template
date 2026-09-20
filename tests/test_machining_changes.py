@@ -23,7 +23,7 @@ import uuid
 import pytest
 
 from app.machining_dfm import MachiningDFMStore
-from app.machining_changes import (
+from app.domains.changes import (
     ACTION_CREATE,
     ACTION_DELETE,
     ACTION_PHOTO,

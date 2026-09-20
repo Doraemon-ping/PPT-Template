@@ -24,7 +24,8 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from .machining_library import AttachmentSpec, LibraryField, TypedLibrary, _stamp
+from ..core.utils import stamp
+from ..db.library import AttachmentSpec, LibraryField, TypedLibrary
 
 PHOTO_KIND = "tool_photo"
 SCOPE_CUT = "cut"  # 切削刀具
@@ -246,7 +247,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
 
     def seed(self, db) -> None:
         """内置字典：只补不改（管理员的改名与新增项都保留）。"""
-        now = _stamp()
+        now = stamp()
         for index, (code, label) in enumerate(TOOL_GROUP_SEED):
             db.execute(
                 "INSERT OR IGNORE INTO tool_groups(code,label,sort_order,builtin,created,updated) "
@@ -319,7 +320,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
         added: list[str] = []
         with _session(self._connect, db) as conn:
             existing = {row["code"] for row in conn.execute(f"SELECT code FROM {self.CATEGORY_TABLE}")}
-            now = _stamp()
+            now = stamp()
             order = int(
                 conn.execute(
                     f"SELECT COALESCE(MAX(sort_order), -1) + 1 FROM {self.CATEGORY_TABLE}"
@@ -344,7 +345,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
         added: list[str] = []
         with _session(self._connect, db) as conn:
             existing = {row["code"] for row in conn.execute(f"SELECT code FROM {self.GROUP_TABLE}")}
-            now = _stamp()
+            now = stamp()
             order = int(
                 conn.execute(
                     f"SELECT COALESCE(MAX(sort_order), -1) + 1 FROM {self.GROUP_TABLE}"
@@ -376,7 +377,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
                 db.execute(
                     f"UPDATE {self.GROUP_TABLE} SET label=?,deleted_at=NULL,deleted_by=NULL,"
                     "deleted_reason=NULL,updated=? WHERE code=?",
-                    (label, _stamp(), code),
+                    (label, stamp(), code),
                 )
                 revived = self._group(code)
                 revived["revived"] = True
@@ -384,7 +385,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
             order = int(
                 db.execute(f"SELECT COALESCE(MAX(sort_order), -1) + 1 FROM {self.GROUP_TABLE}").fetchone()[0]
             )
-            now = _stamp()
+            now = stamp()
             db.execute(
                 f"INSERT INTO {self.GROUP_TABLE}(code,label,sort_order,builtin,created,updated) "
                 "VALUES(?,?,?,0,?,?)",
@@ -407,7 +408,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
                 db.execute(
                     f"UPDATE {self.CATEGORY_TABLE} SET label=?,scope=?,deleted_at=NULL,deleted_by=NULL,"
                     "deleted_reason=NULL,updated=? WHERE code=?",
-                    (label, scope, _stamp(), code),
+                    (label, scope, stamp(), code),
                 )
                 revived = self._category(code)
                 revived["revived"] = True
@@ -417,7 +418,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
                     f"SELECT COALESCE(MAX(sort_order), -1) + 1 FROM {self.CATEGORY_TABLE}"
                 ).fetchone()[0]
             )
-            now = _stamp()
+            now = stamp()
             db.execute(
                 f"INSERT INTO {self.CATEGORY_TABLE}"
                 "(code,label,scope,sort_order,builtin,source,created,updated) VALUES(?,?,?,?,0,'admin',?,?)",
@@ -431,7 +432,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
             if not db.execute(f"SELECT 1 FROM {self.GROUP_TABLE} WHERE code=?", (code,)).fetchone():
                 raise HTTPException(404, f"库分类 {code} 不存在")
             db.execute(
-                f"UPDATE {self.GROUP_TABLE} SET label=?,updated=? WHERE code=?", (label, _stamp(), code)
+                f"UPDATE {self.GROUP_TABLE} SET label=?,updated=? WHERE code=?", (label, stamp(), code)
             )
         return self._group(code)
 
@@ -454,7 +455,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
                     raise HTTPException(409, f"类型「{current['label']}」已被 {used} 件刀具使用，不能改归属")
             db.execute(
                 f"UPDATE {self.CATEGORY_TABLE} SET label=?,scope=?,updated=? WHERE code=?",
-                (label, scope or current["scope"], _stamp(), code),
+                (label, scope or current["scope"], stamp(), code),
             )
         return self._category(code)
 
@@ -504,7 +505,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
             db.execute(
                 f"UPDATE {table} SET deleted_at=NULL,deleted_by=NULL,deleted_reason=NULL,updated=? "
                 "WHERE code=?",
-                (_stamp(), code),
+                (stamp(), code),
             )
         return {"code": code, "label": row["label"], "restored": True}
 
@@ -523,7 +524,7 @@ CREATE INDEX IF NOT EXISTS idx_machining_dfm_tool_categories_scope
                 raise HTTPException(409, f"{label}「{row['label']}」仍被 {used} 件刀具使用，不能删除")
             if row["builtin"]:
                 raise HTTPException(409, f"{label}「{row['label']}」是内置项，不能删除（可以改名称）")
-            now = _stamp()
+            now = stamp()
             # 口径 2：逻辑删除（没有彻底删除，回收站里随时恢复）
             db.execute(
                 f"UPDATE {table} SET deleted_at=?,deleted_by=?,deleted_reason=?,updated=? WHERE code=?",
@@ -687,7 +688,7 @@ class ToolLibrary(TypedLibrary):
         with _session(self._connect, db) as conn:
             rows = conn.execute("SELECT id,category,name FROM tools").fetchall()
             known = {row["code"] for row in conn.execute("SELECT code FROM tool_categories")}
-            now = _stamp()
+            now = stamp()
             for row in rows:
                 code = normalize_category(row["category"], row["name"])
                 if code == row["category"] and code in known:

@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from app.machining_dfm import MachiningDFMStore  # noqa: E402
-from app.machining_projection import report_runtime  # noqa: E402
-from app.native_forms import normalize  # noqa: E402
+from app.services.projection import report_runtime  # noqa: E402
+from app.services.forms import normalize  # noqa: E402
 
 store = MachiningDFMStore(ROOT / "data" / "machining_dfm", ROOT / "app" / "resources" / "machining_dfm_seed")
 projects = store.list()

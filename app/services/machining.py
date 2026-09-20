@@ -1,30 +1,14 @@
-"""Standalone machining form. Run: uvicorn app.services.machining:app --port 8002."""
-from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
-from fastapi.staticfiles import StaticFiles
-from ..settings import BASE_DIR, DATA_DIR, STATIC_DIR
-from ..machining_dfm import MachiningDFMStore, _bearer, router_for
-from .provider_api import install_machining
+# -*- coding: utf-8 -*-
+"""**兼容转发层（历史启动入口）** —— 应用本身在 ``app.main``。
 
-def store():
-    return MachiningDFMStore(DATA_DIR / 'machining_dfm', BASE_DIR / 'app/resources/machining_dfm_seed')
+历史命令 ``uvicorn app.services.machining:app --port 8002`` 与老文档、``run_service.py``、
+``_audit/`` 下的探针都还在用这个路径，所以这里继续暴露 ``app``，但**只是转发**：
+应用的组装（路由、数据源契约、日志、静态页面）全在 ``app.main.create_app()``。
 
-def _guard_logs(authorization: str | None) -> None:
-    """服务日志里有项目名、项目 id 和全部请求路径，只给管理员看（与后台配置同一套密码）。"""
-    store().authorize(_bearer(authorization), 'admin')
+新命令请用 ``uvicorn app.main:app --port 8002``。
+"""
+from __future__ import annotations
 
-app = FastAPI(title='机加 DFM 表单服务', version='2.0')
-from .observability import install as install_logging
-LOG_FILE = install_logging(app, 'machining_dfm', _guard_logs)
-app.include_router(router_for(store, STATIC_DIR))
-install_machining(app, store)
+from ..main import SERVICE_CONTRACT_VERSION, SERVICE_TITLE, app, create_app  # noqa: F401
 
-@app.get('/')
-def home():
-    return RedirectResponse('/machining-dfm')
-
-@app.get('/health')
-def health():
-    return {'service': 'machining', 'contract_version': '1.0'}
-
-app.mount('/static', StaticFiles(directory=str(STATIC_DIR)), name='static')
+__all__ = ["app", "create_app", "SERVICE_TITLE", "SERVICE_CONTRACT_VERSION"]
