@@ -7,7 +7,7 @@
 import math
 
 from .machines import (
-    MACHINES, cur_machine, EJECT_SPEC, GATE_SPEED_TABLE, ASTM_LEVELS,
+    MACHINES, machine_list, machine_scope, cur_machine, EJECT_SPEC, GATE_SPEED_TABLE, ASTM_LEVELS,
     CYL_STD, pick_std, pick_gate_speed_row, TON_N, N_TON, KN_TON,
 )
 from .utils import num, fmt, esc, sstr, T, N, V
@@ -730,7 +730,7 @@ def r_machine(f):
 
 def r_mach_list(f):
     rows = []
-    for m in MACHINES:
+    for m in machine_list():
         sel = (m["brand"] + ' ' + m["model"]) == V(f, 'machineId')
         rows.append([m["brand"], m["model"], {"t": fmt(m["ton"], 0), "n": True},
                      {"t": fmt(m["lock"], 0), "n": True}, {"t": fmt(m["open"], 0), "n": True},
@@ -799,16 +799,17 @@ def machine_fill(f):
     return out
 
 
-def compute_all(f, apply_machine=False):
+def compute_all(f, apply_machine=False, machines=None):
     """一次计算返回：派生值 + 机型填充（可选）+ 全部结果。"""
-    derived = recalc_derived(f)
-    mfill = machine_fill(f) if apply_machine else None
-    results = {}
-    for key, fn in RESULTS.items():
-        try:
-            results[key] = fn(f)
-        except Exception as e:  # 单个结果失败不阻塞整体
-            results[key] = {"html": '<div class="hint">计算暂不可用：' + esc(str(e)) + '</div>', "verdict": ""}
+    with machine_scope(machines):
+        derived = recalc_derived(f)
+        mfill = machine_fill(f) if apply_machine else None
+        results = {}
+        for key, fn in RESULTS.items():
+            try:
+                results[key] = fn(f)
+            except Exception as e:  # 单个结果失败不阻塞整体
+                results[key] = {"html": '<div class="hint">计算暂不可用：' + esc(str(e)) + '</div>', "verdict": ""}
     return {"derived": derived, "machine_fill": mfill, "results": results}
 
 

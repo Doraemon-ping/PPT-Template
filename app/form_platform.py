@@ -384,7 +384,8 @@ def router_for(get_store, static_dir):
         application = get_store().application(app_id)
         if app_id == 'dfm':
             from .demo import demo_state
-            return demo_state()
+            from .a13 import project_state
+            return project_state(demo_state())
         return defaults(application['schema'])
 
     @router.get('/api/form-apps/{app_id}/projects')
@@ -395,7 +396,11 @@ def router_for(get_store, static_dir):
 
     @router.post('/api/form-apps/{app_id}/projects')
     def create_project(app_id: str, req: ProjectSave):
-        return get_store().save_project(app_id, req.name, req.data)
+        data = req.data
+        if app_id == 'dfm':
+            from .a13 import project_state
+            data = project_state(data)
+        return get_store().save_project(app_id, req.name, data)
 
     @router.get('/api/form-apps/{app_id}/drafts/{draft_key}')
     def get_draft(app_id: str, draft_key: str):
@@ -423,11 +428,19 @@ def router_for(get_store, static_dir):
         # from browser/proxy cache or the PPT workbench can render an older
         # snapshot than the form that the user just saved.
         response.headers['Cache-Control'] = 'no-store, max-age=0'
-        return get_store().project(app_id, project_id, revision)
+        result = get_store().project(app_id, project_id, revision)
+        if app_id == 'dfm':
+            from .a13 import project_state
+            result['data'] = project_state(result.get('data'))
+        return result
 
     @router.put('/api/form-apps/{app_id}/projects/{project_id}')
     def update_project(app_id: str, project_id: str, req: ProjectSave):
-        return get_store().save_project(app_id, req.name, req.data, project_id, req.revision)
+        data = req.data
+        if app_id == 'dfm':
+            from .a13 import project_state
+            data = project_state(data)
+        return get_store().save_project(app_id, req.name, data, project_id, req.revision)
 
     @router.get('/api/form-apps/{app_id}/projects/{project_id}/versions')
     def versions(app_id: str, project_id: str):

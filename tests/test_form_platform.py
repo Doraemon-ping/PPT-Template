@@ -96,10 +96,13 @@ class FormPlatformAPITests(unittest.TestCase):
         self.assertEqual(1,len(self.client.get(f'/api/form-apps/{self.a}/projects').json()['projects']))
 
     def test_template_upload_and_scheme_do_not_leak_across_apps(self):
-        for scope in (self.a,self.b): self.assertEqual([],self.client.get('/api/templates?app_id='+scope).json()['templates'])
+        builtin_ids={'official','exact','pilot','demo','table-demo'}
+        for scope in (self.a,self.b):
+            listed=self.client.get('/api/templates?app_id='+scope).json()['templates']
+            self.assertEqual(builtin_ids,{t['template_id'] for t in listed})
         response=self.client.post('/api/templates/upload?app_id='+self.a+'&template_id=inspection',files={'file':('inspection.pptx',fixture())})
         self.assertEqual(200,response.status_code,response.text)
-        self.assertEqual([],self.client.get('/api/templates?app_id='+self.b).json()['templates'])
+        self.assertEqual(builtin_ids,{t['template_id'] for t in self.client.get('/api/templates?app_id='+self.b).json()['templates']})
         slides=[{'source':1,'bindings':{'cell':{'type':'table_cell','shape':'DATA','source':'f.partNo','options':{'row':1,'column':0}}}}]
         payload={'name':'Report','template':'inspection','slides':slides}
         self.assertEqual(200,self.client.post('/api/schemes?app_id='+self.a,json=payload).status_code)
@@ -112,12 +115,20 @@ class FormPlatformAPITests(unittest.TestCase):
         self.assertIn('EQ-901',root.xpath('//*[local-name()="t"]/text()'))
         self.assertEqual(404,self.client.post('/api/template/inspect?app_id='+self.b,json={'template':'inspection'}).status_code)
 
+    def test_imported_app_can_load_existing_builtin_ppt(self):
+        listed=self.client.get('/api/templates?app_id='+self.a).json()['templates']
+        available=[t for t in listed if t['origin']=='builtin' and t['exists']]
+        self.assertTrue(available)
+        response=self.client.post('/api/template/inspect?app_id='+self.a,json={'template':available[0]['template_id']})
+        self.assertEqual(200,response.status_code,response.text)
+
     def test_same_filename_import_keeps_first_template(self):
         url='/api/templates/upload?app_id='+self.a+'&template_id=inspection'
         first=self.client.post(url,files={'file':('inspection.pptx',fixture())}).json()['template']
         second=self.client.post(url,files={'file':('inspection.pptx',fixture())}).json()['template']
         self.assertNotEqual(first['template_id'],second['template_id'])
-        self.assertEqual(2,len(self.client.get('/api/templates?app_id='+self.a).json()['templates']))
+        listed=self.client.get('/api/templates?app_id='+self.a).json()['templates']
+        self.assertEqual(2,len([t for t in listed if t['origin']=='uploaded']))
 
     def test_invalid_scope_cannot_fall_back_to_dfm(self):
         self.assertEqual(404,self.client.get('/api/templates?app_id=../dfm').status_code)

@@ -43,6 +43,8 @@ datas = []
 datas += collect_data_files("app")
 # 前端页面 / 静态资源
 datas += [(str(ROOT / "static"), "static")]
+# /a13 路由直接返回的 A13 单文件工具
+datas += [(str(ROOT / "HPDC_DFM_Generator_A13.html"), ".")]
 # 真实 PPT 预览脚本（live-preview 依赖 PowerShell + PowerPoint COM）：
 # 一次性回退导出 + 常驻 worker，后者避免每次预览重新启动 PowerPoint。
 datas += [

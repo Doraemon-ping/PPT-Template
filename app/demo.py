@@ -64,9 +64,9 @@ DEFAULT_TABLES = {
     ],
     "issues": [
         {"no": "1", "desc": "肋端最大壁厚 28.5 mm，存在热节与缩孔风险（ASTM E505 Level 4）",
-         "prop": "建议掏料减薄至约 6 mm 并增加点冷", "fb": "", "st": "开放"},
+         "prop": "建议掏料减薄至约 6 mm 并增加点冷", "fb": "", "st": "开放", "before": [], "after": []},
         {"no": "2", "desc": "反拔模区域需滑块抽芯，模具成本上升",
-         "prop": "评估产品局部减胶以避免滑块", "fb": "", "st": "待客户确认"},
+         "prop": "评估产品局部减胶以避免滑块", "fb": "", "st": "待客户确认", "before": [], "after": []},
     ],
 }
 
@@ -137,5 +137,10 @@ def demo_state():
         "f08Opt": "增设点冷并采用挤压销局部加压补偿；同步建议产品掏料减薄。",
     }
     t = copy.deepcopy(DEFAULT_TABLES)
-    i = {"logoImg": [default_logo_data_uri()]}
-    return {"f": f, "t": t, "i": i}
+    i = {"logoImg": [default_logo_data_uri()], "productImg": []}
+    from .machines import MACHINES
+    return {
+        "f": f, "t": t, "i": i, "v": {},
+        "mach": {"list": copy.deepcopy(MACHINES)},
+        "quote": {"db": None, "sheet": [], "meta": {}},
+    }

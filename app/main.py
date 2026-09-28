@@ -2,7 +2,8 @@
 """HPDC DFM 报告自动生成工具 —— FastAPI 服务端。
 
 路由：
-  GET  /                              前端界面（static/index.html）
+  GET  /                              FastAPI 前端界面（static/index.html）
+  GET  /a13                           A13 单文件 HTML 工具
   GET  /template-editor               模板工作台（上传模板 → 绑定字段 → 生成）
   POST /api/calc                      工艺计算（派生值 + 机型填充 + 全部结果）
   POST /api/ppt                       生成 PPT（返回 .pptx 文件，旧版 47 页）
@@ -134,7 +135,9 @@ def _registry() -> "TemplateRegistry":
     global TEMPLATE_REGISTRY_SERVICE
     if FORM_SCOPE.get() != 'dfm':
         from .report.ppt.template_registry import TemplateRegistry
-        return TemplateRegistry(_scope_root(), include_builtins=False)
+        # Each imported form owns its uploaded PPTs, while the repository's
+        # built-in templates remain available as shared, read-only starters.
+        return TemplateRegistry(_scope_root(), include_builtins=True, builtin_root=APP_ROOT)
     if TEMPLATE_REGISTRY_SERVICE is None:
         from .report.ppt.template_registry import TemplateRegistry
 
@@ -232,6 +235,7 @@ def import_legacy_project():
 class CalcRequest(BaseModel):
     f: dict = {}
     t: dict = {}
+    mach: dict = {}
     apply_machine: bool = False
 
 
@@ -359,6 +363,17 @@ def _template_map(base_template: str, slides) -> dict:
     return mapping
 
 
+def _powerpoint_slide_ordinal(template_path: Path, source_index: int) -> int:
+    """Translate a stable OOXML slide part number to PowerPoint's ordinal."""
+    from .report.ppt.openxml import OoxmlPackage
+
+    part_numbers = list(OoxmlPackage(template_path).slide_parts())
+    try:
+        return part_numbers.index(int(source_index)) + 1
+    except ValueError as exc:
+        raise ValueError(f"slide index out of range: {source_index}") from exc
+
+
 def _native_unresolved_placeholders(buffer: bytes, data: Dict[str, Any]) -> list[str]:
     """Return target placeholders still present after a native-form render.
 
@@ -420,12 +435,22 @@ def _native_unbound_targets(result, data, *, allow_legacy=False) -> list[str]:
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC_DIR / "index.html")
+    """A13 is the canonical built-in DFM form; FastAPI supplies persistence and PPT tooling."""
+    return a13_html_tool()
+
+
+@app.get("/a13")
+def a13_html_tool():
+    """Expose the A13 reference tool without replacing the refactored API UI."""
+    source = BASE_DIR / "HPDC_DFM_Generator_A13.html"
+    if not source.is_file():
+        raise HTTPException(status_code=404, detail="A13 HTML 工具未随当前版本发布")
+    return FileResponse(source, media_type="text/html; charset=utf-8")
 
 
 @app.post("/api/calc")
 def api_calc(req: CalcRequest):
-    return compute_all(req.f, apply_machine=req.apply_machine)
+    return compute_all(req.f, apply_machine=req.apply_machine, machines=req.mach.get('list'))
 
 
 @app.post("/api/ppt")
@@ -495,6 +520,24 @@ def api_templates():
     return {"templates": records}
 
 
+def _sanitize_template_id(value: str) -> str:
+    """Derive a registry-safe template id from a user-supplied name or filename.
+
+    Non-ASCII characters (e.g. Chinese filenames) are replaced by separators, so
+    leading/trailing separators are stripped and runs collapsed. Without this an
+    id such as ``高压项目DFM交流模板A12版_中文_2025-09-30.pptx`` normalizes to a
+    value starting with ``-`` and is rejected as invalid by ``TemplateRegistry``.
+    """
+    text = re.sub(r"[^A-Za-z0-9_-]+", "-", str(value or "").strip().casefold())
+    text = re.sub(r"[-_]{2,}", "-", text).strip("-_")
+    return text[:64].strip("-_")
+
+
+def _hashed_template_id(value: str) -> str:
+    """Stable fallback id for names without any ASCII alphanumerics."""
+    return "template-" + hashlib.sha256(str(value or "").encode("utf-8")).hexdigest()[:10]
+
+
 @app.post("/api/templates/upload")
 async def api_templates_upload(
     file: UploadFile,
@@ -523,9 +566,13 @@ async def api_templates_upload(
     except Exception as e:  # noqa: BLE001
         raise HTTPException(status_code=422, detail=f"文件不是有效的 PPTX：{e}") from e
 
-    derive_id = (Path(file.filename).stem or "template").strip().casefold()
-    derive_id = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in derive_id)
-    final_id = template_id or derive_id or "uploaded"
+    # 用户可能显式传入中文文件名作为 id（前端即如此）；两种来源都先规范化为
+    # 合法 id，全部落空时用文件名哈希兜底，避免上传因 id 校验失败而整体被拒。
+    final_id = (
+        _sanitize_template_id(template_id)
+        or _sanitize_template_id(Path(file.filename).stem)
+        or _hashed_template_id(file.filename)
+    )
 
     from .report.ppt.template_registry import TemplateRegistryError
 
@@ -568,8 +615,11 @@ def api_template_slide_preview(template_id: str, slide_index: int):
 
     try:
         record = _registry().resolve(template_id)
-        target = render_slide_preview(record.path, slide_index, DATA_DIR / "template_previews")
+        ordinal = _powerpoint_slide_ordinal(record.path, slide_index)
+        target = render_slide_preview(record.path, ordinal, DATA_DIR / "template_previews")
     except TemplateRegistryError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+    except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
     except SlidePreviewError as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
@@ -637,12 +687,15 @@ def api_template_live_preview(req: TemplateLivePreviewRequest):
             template=req.template, output_mode="in_place", missing="keep", slides=[slide]
         )
         generated = TemplateEngine(record.path).generate(deck, req.data, preview_first_item=True, preview_page=req.page)
-        with tempfile.TemporaryDirectory(prefix="dfm-live-preview-", dir=DATA_DIR) as temp_dir:
+        with tempfile.TemporaryDirectory(
+            prefix="dfm-live-preview-", dir=DATA_DIR, ignore_cleanup_errors=True
+        ) as temp_dir:
             temp_root = Path(temp_dir)
             pptx_path = temp_root / "preview.pptx"
             pptx_path.write_bytes(generated.buffer)
+            ordinal = _powerpoint_slide_ordinal(pptx_path, req.slide.source)
             png_path = render_slide_preview(
-                pptx_path, req.slide.source, temp_root / "rendered"
+                pptx_path, ordinal, temp_root / "rendered"
             )
             content = png_path.read_bytes()
         preview_meta = {
@@ -906,7 +959,8 @@ def api_schemes_generate(name: str, req: SchemeGenerateRequest):
 
 @app.get("/api/demo")
 def api_demo():
-    return demo_state()
+    from .a13 import project_state
+    return project_state(demo_state())
 
 
 @app.get("/api/project/load")

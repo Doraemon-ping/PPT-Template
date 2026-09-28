@@ -10,7 +10,7 @@ const path = require("path");
 const vm = require("vm");
 
 const ROOT = path.resolve(__dirname, "..");
-const SRC = path.join(ROOT, "static", "index.html");
+const SRC = path.join(ROOT, "HPDC_DFM_Generator_A13.html");
 const OUT = path.join(ROOT, "static", "dfm_catalog.js");
 
 const html = fs.readFileSync(SRC, "utf8");
@@ -66,13 +66,40 @@ MODULES.forEach((mod) => {
         tables[field.k] = { module: mod.name, group: group.name, label, columns: cols };
       } else if (field.type === "images") {
         images[field.k] = { module: mod.name, group: group.name, label, path: `i.${field.k}[0]` };
-      } else if (field.k && field.type !== "machine") {
+      } else if (field.type === "issueList") {
+        tables[field.k] = { module: mod.name, group: group.name, label: "开口问题清单", columns: {
+          no: "序号", desc: "问题描述", prop: "修改方案 / 建议", fb: "客户回复", st: "状态",
+          before: "优化前图片", after: "优化后图片"
+        }};
+      } else if (field.k && !["machine", "vision", "videos"].includes(field.type)) {
         const pathKey = `f.${field.k}`;
         fields.push({ path: pathKey, module: mod.name, group: group.name, label });
       }
     });
   });
 });
+
+// A13 rich-state projections exposed by app.a13.project_state / a13_platform.js.
+[
+  ["quoteCustomer","客户名称"],["quoteMoldName","模具名称"],["quotePartNo","报价零件号"],
+  ["quoteDate","报价日期"],["quoteAlloy","铝合金材料"],["quoteBlankWeight","毛坯重量"],
+  ["quoteFinishedWeight","成品重量"],["quoteMoldType","模具类型"],["quoteMoldMaterial","模具材料"],
+  ["quoteMachineTonnage","报价机型吨位"],["quoteStructureCondition","结构条件"],["quoteMoldQuantity","模具数量"],
+  ["quoteHasSlider","有无滑块"],["quoteItemCount","报价项数"],["quoteNetTotal","未税合计"],
+  ["quoteTax","税额"],["quoteGrossTotal","含税合计"],["visionDefectCount","缺陷标注数"],
+  ["visionReviewedCount","已复核标注数"]
+].forEach(([key,label])=>fields.push({path:`f.${key}`,module:key.startsWith("vision")?"模流分析（10 项）":"模具报价",group:key.startsWith("vision")?"缺陷标注汇总":"报价汇总",label}));
+
+tables.quoteSheet={module:"模具报价",group:"报价单",label:"报价明细",columns:{key:"项目标识",cat:"类别",desc:"项目描述",unit:"单价",qty:"数量",total:"合计"}};
+tables.machineLibrary={module:"产品信息",group:"压铸机选型评估",label:"项目设备库",columns:{brand:"品牌",model:"型号",ton:"吨位",lock:"锁模力",open:"开模行程",moldMin:"最小容模量",moldMax:"最大容模量",tie:"哥林柱间距",tieDia:"哥林柱直径",injForce:"压射力",injStroke:"压射行程",punch:"冲头直径",v0:"空压射速度",ejForce:"顶出力",ejStroke:"顶出行程",plate:"模板尺寸"}};
+tables.visionDefects={module:"模流分析（10 项）",group:"缺陷标注汇总",label:"缺陷标注与复核",columns:{module:"模流项",image:"云图序号",type:"缺陷类型",severity:"严重度",advice:"处理建议",source:"来源",verdict:"复核结论",confidence:"置信度",x:"X",y:"Y",w:"宽",h:"高"}};
+
+// Fixed, discoverable image paths for the first ten issue cards. Repeated issue
+// pages can still bind relative paths (before.0 / after.0) from the table row.
+for(let n=0;n<10;n++){
+  images[`issueBefore${n+1}`]={module:"问题清单",group:"优化前后对比",label:`问题 ${n+1} 优化前`,path:`t.issues[${n}].before[0]`};
+  images[`issueAfter${n+1}`]={module:"问题清单",group:"优化前后对比",label:`问题 ${n+1} 优化后`,path:`t.issues[${n}].after[0]`};
+}
 
 // 补充后端派生/机器字段（Schema 里已覆盖大部分；这里兜底中文名）
 const DERIVED_LABELS = {

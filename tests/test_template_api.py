@@ -10,7 +10,7 @@ from app.demo import demo_state
 
 try:
     from fastapi.testclient import TestClient
-    from app.main import app
+    from app.main import app, _powerpoint_slide_ordinal
 except ModuleNotFoundError:  # Local bundled test runtime may omit web dependencies.
     TestClient = None
     app = None
@@ -49,6 +49,11 @@ class TemplateAPITests(unittest.TestCase):
         self.assertIn("demo", ids)
         self.assertIn("official", ids)
         self.assertIn("table-demo", ids)
+
+    def test_sparse_ooxml_slide_number_maps_to_powerpoint_ordinal(self):
+        template = Path(__file__).parents[1] / 'templates' / 'DFM_Master_v1.pptx'
+        self.assertEqual(1, _powerpoint_slide_ordinal(template, 85))
+        self.assertEqual(6, _powerpoint_slide_ordinal(template, 90))
 
     def test_scan_demo_template_returns_inventory(self):
         response = self.client.post("/api/template/scan", json={"template": "demo"})

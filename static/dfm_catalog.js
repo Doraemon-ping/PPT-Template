@@ -44,24 +44,6 @@ window.DFM_CATALOG = {
    "label": "项目类型"
   },
   {
-   "path": "f.maker",
-   "module": "项目信息",
-   "group": "封面信息",
-   "label": "编制"
-  },
-  {
-   "path": "f.checker",
-   "module": "项目信息",
-   "group": "封面信息",
-   "label": "审核"
-  },
-  {
-   "path": "f.approver",
-   "module": "项目信息",
-   "group": "封面信息",
-   "label": "批准"
-  },
-  {
    "path": "f.company",
    "module": "项目信息",
    "group": "封面信息",
@@ -70,205 +52,199 @@ window.DFM_CATALOG = {
   {
    "path": "f.wFinish",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "成品重量"
   },
   {
    "path": "f.wCast",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "毛坯重量（铸件）"
   },
   {
    "path": "f.wRunner",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "流道重量"
   },
   {
    "path": "f.wOverflow",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "渣包重量"
   },
   {
    "path": "f.wPour",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "每次浇注重量（自动）"
   },
   {
    "path": "f.wall",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "基本壁厚"
   },
   {
    "path": "f.wallMax",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "最大壁厚"
   },
   {
    "path": "f.dimL",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "产品尺寸 L"
   },
   {
    "path": "f.dimW",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "产品尺寸 W"
   },
   {
    "path": "f.dimH",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "产品尺寸 H"
-  },
-  {
-   "path": "f.moldStructure",
-   "module": "产品信息",
-   "group": "产品信息总表",
-   "label": "模具结构"
   },
   {
    "path": "f.cav",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "腔数"
   },
   {
    "path": "f.castP",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "铸造压力"
   },
   {
    "path": "f.material",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "材料牌号"
   },
   {
    "path": "f.matCustom",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "其他材料（说明）"
   },
   {
    "path": "f.annual",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "年产量"
   },
   {
    "path": "f.surfaceReq",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "表面要求"
   },
   {
    "path": "f.leakReq",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "气密要求"
   },
   {
    "path": "f.leakVal",
    "module": "产品信息",
-   "group": "产品信息总表",
+   "group": "产品信息",
    "label": "气密指标"
   },
   {
    "path": "f.aPart",
    "module": "产品信息",
-   "group": "投影面积 · 胀型力 · 锁模力校核",
+   "group": "压铸机选型评估",
    "label": "产品投影面积"
   },
   {
    "path": "f.aRunner",
    "module": "产品信息",
-   "group": "投影面积 · 胀型力 · 锁模力校核",
+   "group": "压铸机选型评估",
    "label": "流道投影面积"
   },
   {
    "path": "f.aOver",
    "module": "产品信息",
-   "group": "投影面积 · 胀型力 · 锁模力校核",
+   "group": "压铸机选型评估",
    "label": "渣包投影面积"
   },
   {
    "path": "f.aSlider",
    "module": "产品信息",
-   "group": "投影面积 · 胀型力 · 锁模力校核",
+   "group": "压铸机选型评估",
    "label": "滑块投影面积"
-  },
-  {
-   "path": "f.sliderForceAngle",
-   "module": "产品信息",
-   "group": "投影面积 · 胀型力 · 锁模力校核",
-   "label": "滑块胀型力夹角（留空则不折算）"
-  },
-  {
-   "path": "f.lockSafetyFactor",
-   "module": "产品信息",
-   "group": "投影面积 · 胀型力 · 锁模力校核",
-   "label": "锁模安全系数 K"
   },
   {
    "path": "f.useRatio",
    "module": "产品信息",
-   "group": "投影面积 · 胀型力 · 锁模力校核",
+   "group": "压铸机选型评估",
    "label": "锁模力利用率上限"
+  },
+  {
+   "path": "f.autoMach",
+   "module": "产品信息",
+   "group": "压铸机选型评估",
+   "label": "机型自动匹配"
+  },
+  {
+   "path": "f.m6Note",
+   "module": "产品信息",
+   "group": "压铸机选型评估",
+   "label": "压铸机 / 设备资料说明"
   },
   {
    "path": "f.lockKN",
    "module": "产品信息",
-   "group": "投影面积 · 胀型力 · 锁模力校核",
+   "group": "压铸机选型评估",
    "label": "设备锁模力（自动带出）"
   },
   {
    "path": "f.aTotal2",
    "module": "产品信息",
-   "group": "最大铸造压力评估 · 哥林柱受力分布与平衡度",
+   "group": "哥林柱受力分析",
    "label": "总投影面积（含滑块）"
   },
   {
    "path": "f.pMax2",
    "module": "产品信息",
-   "group": "最大铸造压力评估 · 哥林柱受力分布与平衡度",
+   "group": "哥林柱受力分析",
    "label": "最大铸造比压"
   },
   {
    "path": "f.tieX",
    "module": "产品信息",
-   "group": "最大铸造压力评估 · 哥林柱受力分布与平衡度",
+   "group": "哥林柱受力分析",
    "label": "哥林柱中心距 X（Bx）"
   },
   {
    "path": "f.tieY",
    "module": "产品信息",
-   "group": "最大铸造压力评估 · 哥林柱受力分布与平衡度",
+   "group": "哥林柱受力分析",
    "label": "哥林柱中心距 Y（By）"
   },
   {
    "path": "f.exOff",
    "module": "产品信息",
-   "group": "最大铸造压力评估 · 哥林柱受力分布与平衡度",
+   "group": "哥林柱受力分析",
    "label": "投影形心偏移 X（ex）"
   },
   {
    "path": "f.eyOff",
    "module": "产品信息",
-   "group": "最大铸造压力评估 · 哥林柱受力分布与平衡度",
+   "group": "哥林柱受力分析",
    "label": "投影形心偏移 Y（ey）"
   },
   {
    "path": "f.tieDia",
    "module": "产品信息",
-   "group": "最大铸造压力评估 · 哥林柱受力分布与平衡度",
+   "group": "哥林柱受力分析",
    "label": "哥林柱直径"
   },
   {
@@ -948,12 +924,126 @@ window.DFM_CATALOG = {
    "module": "技术应用与结尾",
    "group": "公司介绍 / 致谢 / 保密声明",
    "label": "保密声明"
+  },
+  {
+   "path": "f.quoteCustomer",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "客户名称"
+  },
+  {
+   "path": "f.quoteMoldName",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "模具名称"
+  },
+  {
+   "path": "f.quotePartNo",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "报价零件号"
+  },
+  {
+   "path": "f.quoteDate",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "报价日期"
+  },
+  {
+   "path": "f.quoteAlloy",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "铝合金材料"
+  },
+  {
+   "path": "f.quoteBlankWeight",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "毛坯重量"
+  },
+  {
+   "path": "f.quoteFinishedWeight",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "成品重量"
+  },
+  {
+   "path": "f.quoteMoldType",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "模具类型"
+  },
+  {
+   "path": "f.quoteMoldMaterial",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "模具材料"
+  },
+  {
+   "path": "f.quoteMachineTonnage",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "报价机型吨位"
+  },
+  {
+   "path": "f.quoteStructureCondition",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "结构条件"
+  },
+  {
+   "path": "f.quoteMoldQuantity",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "模具数量"
+  },
+  {
+   "path": "f.quoteHasSlider",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "有无滑块"
+  },
+  {
+   "path": "f.quoteItemCount",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "报价项数"
+  },
+  {
+   "path": "f.quoteNetTotal",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "未税合计"
+  },
+  {
+   "path": "f.quoteTax",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "税额"
+  },
+  {
+   "path": "f.quoteGrossTotal",
+   "module": "模具报价",
+   "group": "报价汇总",
+   "label": "含税合计"
+  },
+  {
+   "path": "f.visionDefectCount",
+   "module": "模流分析（10 项）",
+   "group": "缺陷标注汇总",
+   "label": "缺陷标注数"
+  },
+  {
+   "path": "f.visionReviewedCount",
+   "module": "模流分析（10 项）",
+   "group": "缺陷标注汇总",
+   "label": "已复核标注数"
   }
  ],
  "tables": {
   "dfmHist": {
    "module": "项目信息",
-   "group": "DFM 履历表（可增行）",
+   "group": "DFM 履历",
    "label": "dfmHist",
    "columns": {
     "ver": "版本",
@@ -965,7 +1055,7 @@ window.DFM_CATALOG = {
   },
   "fileStat": {
    "module": "项目信息",
-   "group": "文件状态录入（2D / 3D / ESOW …）",
+   "group": "文件状态",
    "label": "fileStat",
    "columns": {
     "name": "文件名称",
@@ -978,7 +1068,7 @@ window.DFM_CATALOG = {
   },
   "mech": {
    "module": "产品信息",
-   "group": "机械性能要求（各区域）",
+   "group": "机械性能要求",
    "label": "mech",
    "columns": {
     "zone": "区域/位置",
@@ -1055,161 +1145,266 @@ window.DFM_CATALOG = {
   },
   "issues": {
    "module": "问题清单",
-   "group": "开口问题清单（可增行）",
-   "label": "issues",
+   "group": "开口问题清单（卡片式 · 可增删）",
+   "label": "开口问题清单",
    "columns": {
     "no": "序号",
     "desc": "问题描述",
     "prop": "修改方案 / 建议",
     "fb": "客户回复",
-    "st": "状态"
+    "st": "状态",
+    "before": "优化前图片",
+    "after": "优化后图片"
+   }
+  },
+  "quoteSheet": {
+   "module": "模具报价",
+   "group": "报价单",
+   "label": "报价明细",
+   "columns": {
+    "key": "项目标识",
+    "cat": "类别",
+    "desc": "项目描述",
+    "unit": "单价",
+    "qty": "数量",
+    "total": "合计"
+   }
+  },
+  "machineLibrary": {
+   "module": "产品信息",
+   "group": "压铸机选型评估",
+   "label": "项目设备库",
+   "columns": {
+    "brand": "品牌",
+    "model": "型号",
+    "ton": "吨位",
+    "lock": "锁模力",
+    "open": "开模行程",
+    "moldMin": "最小容模量",
+    "moldMax": "最大容模量",
+    "tie": "哥林柱间距",
+    "tieDia": "哥林柱直径",
+    "injForce": "压射力",
+    "injStroke": "压射行程",
+    "punch": "冲头直径",
+    "v0": "空压射速度",
+    "ejForce": "顶出力",
+    "ejStroke": "顶出行程",
+    "plate": "模板尺寸"
+   }
+  },
+  "visionDefects": {
+   "module": "模流分析（10 项）",
+   "group": "缺陷标注汇总",
+   "label": "缺陷标注与复核",
+   "columns": {
+    "module": "模流项",
+    "image": "云图序号",
+    "type": "缺陷类型",
+    "severity": "严重度",
+    "advice": "处理建议",
+    "source": "来源",
+    "verdict": "复核结论",
+    "confidence": "置信度",
+    "x": "X",
+    "y": "Y",
+    "w": "宽",
+    "h": "高"
    }
   }
  },
  "images": {
-  "logoImg": {
-   "module": "项目信息",
-   "group": "封面信息",
-   "label": "公司 LOGO（占位图，可上传）",
-   "path": "i.logoImg[0]"
-  },
-  "productRunnerFrontImg": {
+  "m6Img": {
    "module": "产品信息",
-   "group": "产品信息总表",
-   "label": "产品+浇排正面图",
-   "path": "i.productRunnerFrontImg[0]"
+   "group": "压铸机选型评估",
+   "label": "压铸机 / 设备照片（最多 2 张 · 自动进入 PPT）",
+   "path": "i.m6Img[0]"
   },
-  "productRunnerBackImg": {
+  "prodImg": {
    "module": "产品信息",
-   "group": "产品信息总表",
-   "label": "产品+浇排反面图",
-   "path": "i.productRunnerBackImg[0]"
-  },
-  "plImg3d": {
-   "module": "模具结构",
-   "group": "3D / 2D 分型方案",
-   "label": "分型方案 3D 图",
-   "path": "i.plImg3d[0]"
-  },
-  "plImg2d": {
-   "module": "模具结构",
-   "group": "3D / 2D 分型方案",
-   "label": "分型方案 2D 图",
-   "path": "i.plImg2d[0]"
-  },
-  "insImg": {
-   "module": "模具结构",
-   "group": "镶拼总档与反拔模斜度",
-   "label": "镶拼结构图",
-   "path": "i.insImg[0]"
-  },
-  "dcImg": {
-   "module": "模具结构",
-   "group": "镶块深腔设计 · 冷却与表面处理",
-   "label": "深腔镶块 / 冷却图",
-   "path": "i.dcImg[0]"
-  },
-  "grImg": {
-   "module": "浇排与工艺系统",
-   "group": "流道理念",
-   "label": "流道方案图",
-   "path": "i.grImg[0]"
-  },
-  "vvImg": {
-   "module": "浇排与工艺系统",
-   "group": "真空阀选型",
-   "label": "真空阀布置图",
-   "path": "i.vvImg[0]"
-  },
-  "sqImg": {
-   "module": "浇排与工艺系统",
-   "group": "挤压销布置与配合间隙",
-   "label": "挤压销布置图",
-   "path": "i.sqImg[0]"
+   "group": "产品图片",
+   "label": "产品图片（可多张）",
+   "path": "i.prodImg[0]"
   },
   "f01Img": {
    "module": "模流分析（10 项）",
    "group": "速度",
-   "label": "分析图片（可多张）",
+   "label": "模流分析图片（结果云图，最多 4 张 · 自动进入 PPT）",
    "path": "i.f01Img[0]"
   },
   "f02Img": {
    "module": "模流分析（10 项）",
    "group": "卷气",
-   "label": "分析图片（可多张）",
+   "label": "模流分析图片（结果云图，最多 4 张 · 自动进入 PPT）",
    "path": "i.f02Img[0]"
   },
   "f03Img": {
    "module": "模流分析（10 项）",
    "group": "气压",
-   "label": "分析图片（可多张）",
+   "label": "模流分析图片（结果云图，最多 4 张 · 自动进入 PPT）",
    "path": "i.f03Img[0]"
   },
   "f04Img": {
    "module": "模流分析（10 项）",
    "group": "填充温度",
-   "label": "分析图片（可多张）",
+   "label": "模流分析图片（结果云图，最多 4 张 · 自动进入 PPT）",
    "path": "i.f04Img[0]"
   },
   "f05Img": {
    "module": "模流分析（10 项）",
    "group": "料液追踪",
-   "label": "分析图片（可多张）",
+   "label": "模流分析图片（结果云图，最多 4 张 · 自动进入 PPT）",
    "path": "i.f05Img[0]"
   },
   "f06Img": {
    "module": "模流分析（10 项）",
    "group": "固相分数",
-   "label": "分析图片（可多张）",
+   "label": "模流分析图片（结果云图，最多 4 张 · 自动进入 PPT）",
    "path": "i.f06Img[0]"
   },
   "f07Img": {
    "module": "模流分析（10 项）",
    "group": "氧化物",
-   "label": "分析图片（可多张）",
+   "label": "模流分析图片（结果云图，最多 4 张 · 自动进入 PPT）",
    "path": "i.f07Img[0]"
   },
   "f08Img": {
    "module": "模流分析（10 项）",
    "group": "缩孔",
-   "label": "分析图片（可多张）",
+   "label": "模流分析图片（结果云图，最多 4 张 · 自动进入 PPT）",
    "path": "i.f08Img[0]"
   },
   "f09Img": {
    "module": "模流分析（10 项）",
    "group": "填充率",
-   "label": "分析图片（可多张）",
+   "label": "模流分析图片（结果云图，最多 4 张 · 自动进入 PPT）",
    "path": "i.f09Img[0]"
   },
   "f10Img": {
    "module": "模流分析（10 项）",
    "group": "热平衡与变形",
-   "label": "分析图片（可多张）",
+   "label": "模流分析图片（结果云图，最多 4 张 · 自动进入 PPT）",
    "path": "i.f10Img[0]"
   },
-  "spr1Img": {
-   "module": "质量策划",
-   "group": "SPR 点位分析（第 1 页）",
-   "label": "SPR 点位图（第 1 页）",
-   "path": "i.spr1Img[0]"
+  "issueBefore1": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 1 优化前",
+   "path": "t.issues[0].before[0]"
   },
-  "spr2Img": {
-   "module": "质量策划",
-   "group": "SPR 点位分析（第 2 页）",
-   "label": "SPR 点位图（第 2 页）",
-   "path": "i.spr2Img[0]"
+  "issueAfter1": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 1 优化后",
+   "path": "t.issues[0].after[0]"
   },
-  "trImg": {
-   "module": "质量策划",
-   "group": "追溯策划",
-   "label": "追溯标识图",
-   "path": "i.trImg[0]"
+  "issueBefore2": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 2 优化前",
+   "path": "t.issues[1].before[0]"
   },
-  "isImg": {
-   "module": "技术应用与结尾",
-   "group": "压铸岛：温控 / 喷涂 / 真空设计",
-   "label": "压铸岛布置图",
-   "path": "i.isImg[0]"
+  "issueAfter2": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 2 优化后",
+   "path": "t.issues[1].after[0]"
+  },
+  "issueBefore3": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 3 优化前",
+   "path": "t.issues[2].before[0]"
+  },
+  "issueAfter3": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 3 优化后",
+   "path": "t.issues[2].after[0]"
+  },
+  "issueBefore4": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 4 优化前",
+   "path": "t.issues[3].before[0]"
+  },
+  "issueAfter4": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 4 优化后",
+   "path": "t.issues[3].after[0]"
+  },
+  "issueBefore5": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 5 优化前",
+   "path": "t.issues[4].before[0]"
+  },
+  "issueAfter5": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 5 优化后",
+   "path": "t.issues[4].after[0]"
+  },
+  "issueBefore6": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 6 优化前",
+   "path": "t.issues[5].before[0]"
+  },
+  "issueAfter6": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 6 优化后",
+   "path": "t.issues[5].after[0]"
+  },
+  "issueBefore7": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 7 优化前",
+   "path": "t.issues[6].before[0]"
+  },
+  "issueAfter7": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 7 优化后",
+   "path": "t.issues[6].after[0]"
+  },
+  "issueBefore8": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 8 优化前",
+   "path": "t.issues[7].before[0]"
+  },
+  "issueAfter8": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 8 优化后",
+   "path": "t.issues[7].after[0]"
+  },
+  "issueBefore9": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 9 优化前",
+   "path": "t.issues[8].before[0]"
+  },
+  "issueAfter9": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 9 优化后",
+   "path": "t.issues[8].after[0]"
+  },
+  "issueBefore10": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 10 优化前",
+   "path": "t.issues[9].before[0]"
+  },
+  "issueAfter10": {
+   "module": "问题清单",
+   "group": "优化前后对比",
+   "label": "问题 10 优化后",
+   "path": "t.issues[9].after[0]"
   }
  },
  "derived": {

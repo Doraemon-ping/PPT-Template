@@ -256,6 +256,9 @@ function fieldMeta(path){
     var mm=path.match(/^i\.(\w+)(\[0\])?$/);
     if(mm&&CAT.images[mm[1]]){var im=CAT.images[mm[1]];
       return {label:im.label, pathLabel:im.module+'.'+im.group+'.'+im.label, sourcePath:im.source_path||''};}
+  }else if(CAT.images&&Object.keys(CAT.images).some(function(k){return CAT.images[k].path===path;})){
+    var customKey=Object.keys(CAT.images).find(function(k){return CAT.images[k].path===path;});
+    if(customKey){var custom=CAT.images[customKey];return {label:custom.label,pathLabel:custom.module+'.'+custom.group+'.'+custom.label,sourcePath:custom.source_path||''};}
   }else if(path.indexOf('derived.')===0){
     var d=path.slice(8);
     if(CAT.derived[d])return {label:CAT.derived[d], pathLabel:'自动派生.'+CAT.derived[d]};
@@ -306,7 +309,15 @@ async function api(path,opts){opts=Object.assign({cache:'no-store'},opts||{});va
 async function refreshTemplates(){
   var r=await api('/api/templates');var list=(await r.json()).templates;
   $('#selTemplate').innerHTML=list.map(function(t){
-    return '<option value="'+esc(t.template_id)+'">'+esc(t.template_id+(t.origin==='uploaded'?'（已上传）':'（内置）'))+'</option>';}).join('');
+    var unavailable=!t.exists;
+    var suffix=t.origin==='uploaded'?'（已上传）':(unavailable?'（内置文件缺失）':'（内置）');
+    return '<option value="'+esc(t.template_id)+'"'+(unavailable?' disabled':'')+'>'+esc(t.template_id+suffix)+'</option>';}).join('');
+  var preferred=state.template;
+  var preferredOption=preferred&&Array.from($('#selTemplate').options).find(function(o){return o.value===preferred&&!o.disabled;});
+  var fallback=Array.from($('#selTemplate').options).find(function(o){return !o.disabled;});
+  if(preferredOption)$('#selTemplate').value=preferred;
+  else if(fallback){$('#selTemplate').value=fallback.value;state.template=fallback.value;}
+  else state.template=null;
 }
 $('#btnRefreshTemplates').addEventListener('click',refreshTemplates);
 
@@ -348,7 +359,7 @@ async function loadData(){
     if(state.dataRequest!==version)return false;CAT=freshCatalog;state.data=loaded;renderFieldHint();return true;
   }
   var calc=await api('/api/calc',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({f:loaded.f||{},t:loaded.t||{},apply_machine:false})}).then(function(r){return r.json();});
+    body:JSON.stringify({f:loaded.f||{},t:loaded.t||{},mach:loaded.mach||{},apply_machine:false})}).then(function(r){return r.json();});
   if(state.dataRequest!==version)return false;
   loaded.derived=calc.derived;loaded.calc_results={};
   Object.keys(calc.results).forEach(function(k){loaded.calc_results[k]={verdict:calc.results[k].verdict};});
@@ -1311,8 +1322,10 @@ if(draft.payload){state.template=draft.payload.template;state.baseTemplate=draft
 draftReady=true;$('#draftSyncStatus').textContent=draft.payload?'已载入服务端工作台草稿':'工作台修改将自动保存到服务端';
 await refreshTemplates();
   var cp=currentPage();
-  if(cp&&cp.template)state.template=cp.template;
-  if(state.template){$('#selTemplate').value=state.template;}
+  if(cp&&cp.template){
+    var cpOption=Array.from($('#selTemplate').options).find(function(o){return o.value===cp.template&&!o.disabled;});
+    if(cpOption){state.template=cp.template;$('#selTemplate').value=cp.template;}
+  }
   await loadData();await loadTemplate();
 await refreshSchemeList(FORM_PARAMS.get('scheme'));
 if(FORM_PARAMS.get('scheme'))$('#btnSchemeLoad').click();

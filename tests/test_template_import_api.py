@@ -2,6 +2,7 @@
 import io
 import unittest
 from pathlib import Path
+from urllib.parse import quote
 
 from pptx import Presentation
 
@@ -86,6 +87,42 @@ class TemplateImportBindAPITests(unittest.TestCase):
             files={"file": ("broken.pptx", b"not a zip at all", "application/octet-stream")},
         )
         self.assertEqual(422, response.status_code)
+
+    def test_upload_chinese_filename_derives_safe_template_id(self):
+        """回归：中文文件名模板曾一律 409 invalid template id。
+
+        前端把「去掉结尾 .pptx 的文件名」作为 template_id 传入；中文会被规范化成
+        前导 '-'，而注册表要求 id 以字母或数字开头，于是所有中文名模板都无法上传。
+        """
+        name = "高压项目DFM交流模板A12版_中文_2025-09-30.pptx  -  已修复.pptx"
+        # 前端只去掉结尾的 .pptx，内层 .pptx 留在 id 里（真实报错中的形式）
+        sent_id = name[: -len(".pptx")]
+        with open(DEMO, "rb") as fp:
+            response = self.client.post(
+                "/api/templates/upload?template_id=" + quote(sent_id),
+                files={"file": (name, fp, "application/octet-stream")},
+            )
+        self.assertEqual(200, response.status_code, response.text)
+        template_id = response.json()["template"]["template_id"]
+        self.assertRegex(template_id, r"^dfm-a12-2025-09-30-pptx(-\d+)?$")
+        self.assertEqual(200, self.client.delete(f"/api/templates/{template_id}").status_code)
+
+    def test_upload_derives_safe_id_from_chinese_filename(self):
+        """未指定 template_id 时也从中文文件名派生合法 id，无 ASCII 时哈希兜底。"""
+        for filename, pattern in [
+            ("高压项目DFM交流模板A12版.pptx", r"^dfm-a12(-\d+)?$"),
+            ("高压项目.pptx", r"^template-[0-9a-f]{10}(-\d+)?$"),
+        ]:
+            with self.subTest(filename=filename):
+                with open(DEMO, "rb") as fp:
+                    response = self.client.post(
+                        "/api/templates/upload",
+                        files={"file": (filename, fp, "application/octet-stream")},
+                    )
+                self.assertEqual(200, response.status_code, response.text)
+                template_id = response.json()["template"]["template_id"]
+                self.assertRegex(template_id, pattern)
+                self.client.delete(f"/api/templates/{template_id}")
 
     def test_workbench_page_served(self):
         response = self.client.get("/template-editor")

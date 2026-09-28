@@ -4,6 +4,8 @@
 对应原 HTML 工具中的 MACHINES / EJECT_SPEC / GATE_SPEED_TABLE / ASTM_LEVELS。
 """
 import math
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 # ---------- 单位常量 ----------
 TON_N = 9806.65      # 1 吨力(tf) = 9806.65 N
@@ -49,22 +51,39 @@ MACHINES = [
 ]
 
 DEFAULT_MACHINE_ID = "力劲 LK DCC3000"
+_MACHINE_OVERRIDE = ContextVar("dfm_machine_override", default=None)
 
 
-def machine_by_id(machine_id):
+def machine_list(custom=None):
+    source = custom if custom is not None else _MACHINE_OVERRIDE.get()
+    valid = [m for m in (source or []) if isinstance(m, dict) and m.get("brand") and m.get("model")]
+    return valid or MACHINES
+
+
+@contextmanager
+def machine_scope(custom=None):
+    token = _MACHINE_OVERRIDE.set(machine_list(custom))
+    try:
+        yield
+    finally:
+        _MACHINE_OVERRIDE.reset(token)
+
+
+def machine_by_id(machine_id, machines=None):
     """按 '品牌 型号' 查找机型，找不到返回 None。"""
     if not machine_id:
         return None
-    for m in MACHINES:
+    for m in machine_list(machines):
         if m["brand"] + " " + m["model"] == machine_id:
             return m
     return None
 
 
-def cur_machine(f):
-    """当前选中机型；未选中时默认 DCC3000（MACHINES[2]）。"""
-    m = machine_by_id(f.get("machineId", ""))
-    return m or MACHINES[2]
+def cur_machine(f, machines=None):
+    """当前选中机型；A13 可传入项目自定义设备库。"""
+    library = machine_list(machines)
+    m = machine_by_id(f.get("machineId", ""), library)
+    return m or library[min(2, len(library) - 1)]
 
 
 # ---------- 顶杆规格参考（∅4 ~ ∅12，许用应力 50 MPa） ----------

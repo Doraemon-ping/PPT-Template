@@ -473,13 +473,16 @@ def build_data_context(data: Mapping[str, Any], *, binding_sources=None) -> Dict
                             continue
                     context[scope][name] = value
         return context
+    from app.a13 import project_state
+    data = project_state(data)
     f = dict(data.get("f") or {})
     t = dict(data.get("t") or {})
     i = dict(data.get("i") or {})
-    calculated = compute_all(f, apply_machine=False)
+    machine_rows = ((data.get("mach") or {}).get("list") if isinstance(data.get("mach"), Mapping) else None)
+    calculated = compute_all(f, apply_machine=False, machines=machine_rows)
     verdicts = {key: value.get("verdict", "") for key, value in calculated["results"].items()}
     force = calc_force(f)
-    machine = cur_machine(f)
+    machine = cur_machine(f, machine_rows)
 
     def display(value, digits=0):
         try:

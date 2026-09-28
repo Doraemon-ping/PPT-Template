@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "static" / "dfm_catalog.js"
-INDEX = ROOT / "static" / "index.html"
+INDEX = ROOT / "HPDC_DFM_Generator_A13.html"
 
 
 def load_catalog() -> dict:
@@ -29,6 +29,8 @@ def schema_field_keys() -> set:
         # 表格列带 w:、模流项行带 tip:，均非表单字段描述符
         if ", w:" in rest or ", tip:" in rest:
             continue
+        if any("type:'%s'" % kind in rest for kind in ("machine", "vision", "videos")):
+            continue
         keys.add(key)
     return keys
 
@@ -49,8 +51,8 @@ class FieldCatalogTests(unittest.TestCase):
     def test_example_fields_translated(self):
         examples = {
             "f.projName": ("项目信息", "封面信息", "项目名称"),
-            "f.wFinish": ("产品信息", "产品信息总表", "成品重量"),
-            "f.leakReq": ("产品信息", "产品信息总表", "气密要求"),
+            "f.wFinish": ("产品信息", "产品信息", "成品重量"),
+            "f.leakReq": ("产品信息", "产品信息", "气密要求"),
         }
         for path, (module, group, label) in examples.items():
             entry = next(x for x in self.catalog["fields"] if x["path"] == path)
@@ -73,7 +75,8 @@ class FieldCatalogTests(unittest.TestCase):
         table_keys = set(self.catalog["tables"])
         image_keys = set(self.catalog["images"])
         field_keys = {x["path"][2:] for x in self.catalog["fields"]}
-        missing = literal_keys - field_keys - table_keys - image_keys
+        table_column_keys = {key for table in self.catalog["tables"].values() for key in table["columns"]}
+        missing = literal_keys - field_keys - table_keys - image_keys - table_column_keys
         self.assertEqual(set(), missing, f"Schema 字段未进入目录: {sorted(missing)}")
 
 

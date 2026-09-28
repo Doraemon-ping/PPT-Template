@@ -62,9 +62,12 @@ class TemplateRecord:
 class TemplateRegistry:
     """Resolve template ids to files; persists uploaded templates on disk."""
 
-    def __init__(self, root: Path, *, include_builtins=True) -> None:
+    def __init__(self, root: Path, *, include_builtins=True, builtin_root: Optional[Path] = None) -> None:
         self.root = Path(root)
         self.include_builtins = include_builtins
+        # Imported form applications keep uploads in their own isolated root,
+        # but may still use the repository's read-only built-in PPT templates.
+        self.builtin_root = Path(builtin_root) if builtin_root is not None else self.root
         self.storage = self.root / UPLOADED_DIR / TEMPLATES_SUBDIR
         self.registry_file = self.storage / REGISTRY_FILE
         self._uploaded: Dict[str, TemplateRecord] = {}
@@ -76,7 +79,7 @@ class TemplateRegistry:
         for template_id, relative in (_BUILTIN_PATHS.items() if self.include_builtins else []):
             records.append(TemplateRecord(
                 template_id=template_id,
-                path=self.root / relative,
+                path=self.builtin_root / relative,
                 origin="builtin",
                 source_name=relative,
             ))

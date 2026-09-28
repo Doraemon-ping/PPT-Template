@@ -172,7 +172,15 @@ def adapt_legacy_report(
     i: Optional[Mapping[str, Any]] = None,
     *,
     metadata: Optional[Mapping[str, Any]] = None,
+    v: Optional[Mapping[str, Any]] = None,
+    mach: Optional[Mapping[str, Any]] = None,
+    quote: Optional[Mapping[str, Any]] = None,
 ) -> DFMReport:
-    """Convenience entry point for callers that do not need adapter state."""
+    """Adapt legacy fields while accepting A13 rich-state siblings.
+
+    ``v``, ``mach`` and ``quote`` are projected for template binding elsewhere;
+    accepting them here keeps callers that unpack a complete A13 snapshot
+    backward compatible with the presentation-neutral report adapter.
+    """
 
     return LegacyDFMReportAdapter().adapt(f, t, i, metadata=metadata)
