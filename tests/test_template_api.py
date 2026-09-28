@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
+import contextlib
 import io
+import threading
 import unittest
+import zipfile
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
+from PIL import Image
 from pptx import Presentation
 
-from app.demo import demo_state
+from tests.demo_data import demo_state
 
 try:
     from fastapi.testclient import TestClient
@@ -16,11 +21,50 @@ except ModuleNotFoundError:  # Local bundled test runtime may omit web dependenc
     app = None
 
 
+def _make_png(color=(0, 128, 255), size=(48, 32)) -> bytes:
+    output = io.BytesIO()
+    Image.new("RGB", size, color).save(output, format="PNG")
+    return output.getvalue()
+
+
+@contextlib.contextmanager
+def _image_server(raw: bytes):
+    """临时图片服务：只服务 /assets/photo.png，用于验证 http 图片字段的完整链路。"""
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path != "/assets/photo.png":
+                self.send_error(404)
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, _format, *_args):
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}/assets/photo.png"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def _part_bytes_from(pptx_bytes: bytes, name: str) -> bytes:
+    with zipfile.ZipFile(io.BytesIO(pptx_bytes)) as archive:
+        return archive.read(name)
+
+
 @unittest.skipUnless(TestClient is not None, "FastAPI/httpx test dependencies are not installed")
 class TemplateAPITests(unittest.TestCase):
     def test_formula_preview_renders_existing_parameters(self):
         response = self.client.post('/api/template/formula-preview', json={
-            'expression': 'F = [[{f.aPart} × {f.castP}|10]] = {ppt.force.part} kN', 'data': {'f': {'aPart': 820, 'castP': 80}},
+            'expression': 'F = [[{f.aPart} × {f.castP}|10]] kN', 'data': {'f': {'aPart': 820, 'castP': 80}},
         })
         self.assertEqual(200, response.status_code)
         self.assertTrue(response.content.startswith(b'\x89PNG'))
@@ -100,6 +144,20 @@ class TemplateAPITests(unittest.TestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual('2', response.headers['x-dfm-images-missing'])
         self.assertEqual(1, len(Presentation(io.BytesIO(response.content)).slides))
+
+    def test_generate_binds_image_from_http_url(self):
+        """接口接入的图片字段是 http 地址：生成时服务端要自己下载并写进 PPT。"""
+        raw = _make_png()
+        with _image_server(raw) as url:
+            response = self.client.post('/api/template/generate', json={
+                'template': 'demo', 'slides': [{'source': 2, 'bindings': {
+                    'front': {'type': 'image', 'source': 'i.productRunnerFrontImg[0]', 'shape': 'PART_IMAGE'},
+                }}], 'data': {'f': {}, 'i': {'productRunnerFrontImg': [url]}},
+            })
+        self.assertEqual(200, response.status_code, response.text)
+        media = _part_bytes_from(response.content, 'ppt/media/image1.png')
+        self.assertTrue(media.startswith(b'\x89PNG'), media[:16])
+        self.assertEqual((48, 32), Image.open(io.BytesIO(media)).size)
 
     def test_live_preview_applies_data_and_does_not_modify_template(self):
         from app.services.workbench import _registry

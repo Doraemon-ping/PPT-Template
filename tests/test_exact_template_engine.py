@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pptx import Presentation
 
-from app.demo import demo_state
+from tests.demo_data import demo_state
 from app.dfm import adapt_legacy_report
 from app.report.ppt import ExactTemplateEngine
 

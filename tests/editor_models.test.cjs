@@ -10,6 +10,30 @@ test('cell image binding keeps image type even when field currently has no image
   assert.equal(m.isImageSource('f.name','part'),false);
 });
 
+test('interface image fields are recognized as images even without a file extension',()=>{
+  // 接口接入的图片字段：i. 前缀 + http 绝对地址，地址常常没有扩展名
+  const url='http://127.0.0.1:8002/api/machining-dfm/assets/f95d0a5f54314afa859e223eb7e57197';
+  assert.equal(m.isImageSource('i.product_url[0]',url),true);
+  assert.equal(m.isImageSource('i.product_url[0]',[url]),true);
+  assert.equal(m.isImageSource('i.product_url[0]',undefined),true); // 当前数据为空也要能绑图片
+  assert.equal(m.isImageValue(url),false);            // 无扩展名时只能靠 i. 前缀判定
+  assert.equal(m.isImageValue('https://a.example/x/photo.PNG?sig=1'),true);
+  assert.equal(m.isImageValue('data:image/png;base64,AAA'),true);
+  assert.equal(m.isImageValue('TUOPU · 压铸工艺部'),false);
+  assert.equal(m.isImageSource('f.doc_url','https://a.example/report.pdf'),false);
+});
+
+test('workspace mode never scopes api calls to a form provider',()=>{
+  // 工作空间的数据来自 API Connector：带 app_id 会让后端解析一个不存在的表单提供方，
+  // 模板清单/扫描/预览/生成全部 404（工作空间里根本绑不了）。
+  assert.equal(m.scopedApiPath('/api/templates',{origin:'http://x',workspaceId:3,appId:'dfm'}),'/api/templates');
+  assert.equal(m.scopedApiPath('/api/template/inspect',{origin:'http://x',workspaceId:3,appId:'machining-dfm'}),'/api/template/inspect');
+  // 普通模式（表单跳转）照旧带 app_id，其他查询参数原样保留。
+  assert.equal(m.scopedApiPath('/api/templates',{origin:'http://x',appId:'machining-dfm'}),'/api/templates?app_id=machining-dfm');
+  assert.equal(m.scopedApiPath('/api/schemes?name=a',{origin:'http://x',appId:'dfm'}),'/api/schemes?name=a&app_id=dfm');
+  assert.equal(m.scopedApiPath('/api/ppt/sources/dfm',{origin:'http://x'}),'/api/ppt/sources/dfm');
+});
+
 test('table config is recovered by shape identity across legacy and new binding keys',()=>{
   const bindings={
     'rows:表格':{type:'table_rows',shape:'表格',source:'t.fileStat',options:{shape_id:4,rows_per_page:5}},

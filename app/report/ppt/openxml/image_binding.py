@@ -8,14 +8,23 @@ import base64
 import binascii
 import io
 import re
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from lxml import etree
 from PIL import Image
 
 from .package_editor import OoxmlPackage, OoxmlPackageError
+
+#: 下载外部图片的上限与超时；单机工具下够用，同时避免拉爆内存或卡住渲染。
+IMAGE_MAX_BYTES = 20 * 1024 * 1024
+IMAGE_DOWNLOAD_TIMEOUT = 15.0
+IMAGE_URL_CACHE_LIMIT = 24
+_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg")
+_image_url_cache: "OrderedDict[str, bytes]" = OrderedDict()
 
 NS = {
     "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
@@ -42,8 +51,61 @@ class ImageBindingResult:
     replaced_in_place: bool
 
 
+def is_image_url(value) -> bool:
+    """http(s) 图片地址（按扩展名判断，去掉查询串再比）。"""
+    if not isinstance(value, str):
+        return False
+    text = value.strip().casefold()
+    if not text.startswith(("http://", "https://")):
+        return False
+    return text.split("?", 1)[0].endswith(_IMAGE_EXTENSIONS)
+
+
+def is_image_reference(value) -> bool:
+    """这个值是不是指向一张图片：data URI、http(s) 图片地址或本地文件。
+
+    文字片段、公式这类只能放文字的位置用它挡住图片值；接口接入的图片字段
+    解析后是绝对 http 地址，所以这里必须把 http 也算上。
+    """
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else None
+    if isinstance(value, (bytes, Path)):
+        return True
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if text.startswith("data:"):
+        return True
+    if is_image_url(text):
+        return True
+    return bool(text) and Path(text).is_file()
+
+
+def download_image(url: str) -> bytes:
+    """下载 http(s) 图片并缓存；失败时给出可读的错误。"""
+    cached = _image_url_cache.get(url)
+    if cached is not None:
+        _image_url_cache.move_to_end(url)
+        return cached
+    try:
+        with httpx.Client(timeout=IMAGE_DOWNLOAD_TIMEOUT, follow_redirects=True, trust_env=False) as client:
+            response = client.get(url)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        raise ImageBindingError(f"图片地址下载失败：{url}（{exc}）") from exc
+    content = response.content
+    if not content:
+        raise ImageBindingError(f"图片地址返回空内容：{url}")
+    if len(content) > IMAGE_MAX_BYTES:
+        raise ImageBindingError(f"图片超过 {IMAGE_MAX_BYTES // (1024 * 1024)}MB：{url}")
+    _image_url_cache[url] = content
+    while len(_image_url_cache) > IMAGE_URL_CACHE_LIMIT:
+        _image_url_cache.popitem(last=False)
+    return content
+
+
 def decode_image_bytes(value) -> bytes:
-    """Accept bytes, Path, and base64 data URIs; return raw image bytes.
+    """Accept bytes, Path, base64 data URIs and http(s) URLs; return raw image bytes.
 
     Plain text strings are rejected with a clear message instead of being
     interpreted as a missing file path (common when a text field such as a
@@ -51,6 +113,8 @@ def decode_image_bytes(value) -> bytes:
     """
     if isinstance(value, (list, tuple)):
         value = value[0] if value else None
+    if isinstance(value, io.BytesIO):
+        return value.getvalue()
     if isinstance(value, bytes):
         return value
     if isinstance(value, Path):
@@ -65,6 +129,9 @@ def decode_image_bytes(value) -> bytes:
                 return base64.b64decode(payload, validate=True)
             except (ValueError, binascii.Error) as exc:
                 raise ImageBindingError(f"图片 data URI 解码失败：{exc}") from exc
+        if text[:7].casefold() == "http://" or text[:8].casefold() == "https://":
+            # 接口接入的图片字段经 url_base 解析后就是 http 地址，服务端渲染时要自己下载
+            return download_image(text)
         if text:
             candidate = Path(text)
             if candidate.is_file():
@@ -74,7 +141,7 @@ def decode_image_bytes(value) -> bytes:
                     raise ImageBindingError(f"图片文件读取失败 {text!r}: {exc}") from exc
             raise ImageBindingError(
                 "绑定到图片对象的值不是图片：当前值是普通文本"
-                + f"（{text[:48]!r}）。请关联图片字段（上传到表单的图片，值以 data: 开头），"
+                + f"（{text[:48]!r}）。请关联图片字段（data: 图片、http(s) 图片地址或本地文件），"
                 "或把该对象改为文本绑定。"
             )
     raise ImageBindingError("图片源为空或不支持的格式")

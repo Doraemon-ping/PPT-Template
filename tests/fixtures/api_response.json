@@ -1,0 +1,17 @@
+{
+  "projectName": "新能源汽车外壳",
+  "issues": [
+    {
+      "problemName": "拔模角不足",
+      "level": "High",
+      "image": "issue-001.png",
+      "status": "待处理"
+    },
+    {
+      "problemName": "加强筋过厚",
+      "level": "Medium",
+      "image": "issue-002.png",
+      "status": "处理中"
+    }
+  ]
+}

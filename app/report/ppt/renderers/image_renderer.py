@@ -11,6 +11,7 @@ from typing import Any, Optional
 from PIL import Image
 
 from ..exceptions import RendererError
+from ..openxml.image_binding import ImageBindingError, decode_image_bytes
 from .base import RenderContext
 
 
@@ -131,19 +132,7 @@ class ImageRenderer:
         if isinstance(value, (list, tuple)):
             value = next((item for item in value if item not in (None, "")), None)
         try:
-            if isinstance(value, io.BytesIO):
-                return io.BytesIO(value.getvalue())
-            if isinstance(value, bytes):
-                return io.BytesIO(value)
-            if isinstance(value, Path):
-                return io.BytesIO(value.read_bytes())
-            if isinstance(value, str) and value.startswith("data:") and "," in value:
-                header, payload = value.split(",", 1)
-                if ";base64" not in header:
-                    raise ValueError("only base64 data URIs are supported")
-                return io.BytesIO(base64.b64decode(payload, validate=True))
-            if isinstance(value, str) and value.strip():
-                return io.BytesIO(Path(value).read_bytes())
-        except Exception as exc:
+            # 统一走 decode_image_bytes：接口接入的图片字段是 http 地址，这里要能下载
+            return io.BytesIO(decode_image_bytes(value))
+        except ImageBindingError as exc:
             raise RendererError(self.name, context.slide_key, shape.name, str(exc)) from exc
-        raise RendererError(self.name, context.slide_key, shape.name, "image source is empty or unsupported")

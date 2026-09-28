@@ -131,10 +131,8 @@ button:disabled{opacity:.5;cursor:not-allowed}.page-item .page-tools{display:fle
       <button class="sm" id="btnRefreshTemplates" style="margin-top:4px">刷新清单</button>
       <label>或导入 .pptx 模板文件</label>
       <input type="file" id="fileUpload" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation">
-      <label>网页表单数据来源</label>
+      <label id="dataSourceLabel">网页表单数据来源</label>
       <select id="selData">
-        <option value="demo">示例数据（表单全填示例）</option>
-        <option value="project">服务器已保存项目</option>
         <option value="empty">空数据</option>
       </select>
       <button class="pri" id="btnLoadTpl" style="margin-top:6px;width:100%">加载模板</button>
@@ -208,8 +206,8 @@ button:disabled{opacity:.5;cursor:not-allowed}.page-item .page-tools{display:fle
     </div>
 
     <div class="card">
-      <h3>表单字段目录（绑定到 PPT 模板目标）</h3>
-      <div class="hint">PPT 模板决定“目标对象”和占位符名称；这里仅列出当前 HTML 表单的真实字段。
+      <h3 id="fieldCatalogTitle">表单字段目录（绑定到 PPT 模板目标）</h3>
+      <div class="hint" id="fieldCatalogHelp">PPT 模板决定“目标对象”和占位符名称；这里仅列出当前 HTML 表单的真实字段。
         先选择上方模板目标，再点字段建立显式绑定，不依赖任何固定的客户/零件字段命名。</div>
       <div id="fieldHint"></div>
     </div>
@@ -230,7 +228,7 @@ button:disabled{opacity:.5;cursor:not-allowed}.page-item .page-tools{display:fle
   <div class="dialog-footer"><span class="hint" style="flex:1">插入的是独立副本，可在当前方案继续编辑。</span><button class="pri" id="btnConfirmReuse" disabled>插入这一页</button></div>
 </dialog>
 
-<script src="/static/editor_models.js"></script>
+<script src="/static/editor_models.js?v=2"></script>
 <script>
 "use strict";
 /* =========================================================================
@@ -238,11 +236,12 @@ button:disabled{opacity:.5;cursor:not-allowed}.page-item .page-tools{display:fle
  *  state.deck[i] = {source, repeat, condition, bindings: {key: spec}}
  *  spec = {type:'text'|'image'|'table_cell', source, shape, options?:{row,column}}
  * ========================================================================= */
-var state = {template:null, baseTemplate:null, data:null, inspect:null, scan:null, deck:[], current:0, previewSource:1, previewVersion:0};
+var state = {template:null, baseTemplate:null, data:null, inspect:null, scan:null, deck:[], current:0, previewSource:1, previewVersion:0, bindingContext:null};
 var LS_KEY = 'dfm_workbench_deck_v1';
 var FORM_PARAMS=new URLSearchParams(location.search),FORM_APP=FORM_PARAMS.get('app_id')||'dfm',FORM_PROJECT=FORM_PARAMS.get('project_id');
-LS_KEY+=':'+FORM_APP+':'+(FORM_PROJECT||'templates');
-function scopedUrl(path){var url=new URL(path,location.origin);url.searchParams.set('app_id',FORM_APP);return url.pathname+url.search;}
+var WORKSPACE_ID=Number(FORM_PARAMS.get('workspace_id'))||0,WORKSPACE_TEMPLATE=FORM_PARAMS.get('template')||'';
+LS_KEY+=WORKSPACE_ID?(':workspace:'+WORKSPACE_ID+':'+WORKSPACE_TEMPLATE):(':'+FORM_APP+':'+(FORM_PROJECT||'templates'));
+function scopedUrl(path){return EditorModels.scopedApiPath(path,{origin:location.origin,workspaceId:WORKSPACE_ID,appId:FORM_APP});}
 var CANVAS_W = 1000; // 设计宽度(px)，EMU->px 由缩放换算
 var CAT = {fields:[],tables:{},images:{},derived:{},results:{}};
 
@@ -254,8 +253,8 @@ function fieldMeta(path){
     var f=CAT.fields.find(function(x){return x.path===path;});
     if(f)return {label:f.label, pathLabel:f.module+'.'+f.group+'.'+f.label, sourcePath:f.source_path||''};
   }else if(path.indexOf('i.')===0){
-    var mm=path.match(/^i\.(\w+)(\[0\])?$/);
-    if(mm&&CAT.images[mm[1]]){var im=CAT.images[mm[1]];
+    var imageName=path.slice(2).replace(/\[\d+\]$/,'');
+    if(CAT.images[imageName]){var im=CAT.images[imageName];
       return {label:im.label, pathLabel:im.module+'.'+im.group+'.'+im.label, sourcePath:im.source_path||''};}
   }else if(path.indexOf('derived.')===0){
     var d=path.slice(8);
@@ -264,9 +263,10 @@ function fieldMeta(path){
     var cm=path.match(/^calc_results\.(\w+)\.verdict$/);
     if(cm&&CAT.results[cm[1]])return {label:CAT.results[cm[1]], pathLabel:'计算结论.'+CAT.results[cm[1]]};
   }else if(path.indexOf('t.')===0){
-    var tm=path.match(/^t\.(\w+)(?:\[\d+\])?(?:\.([^.]+))?$/);
-    if(tm&&CAT.tables[tm[1]]){var tb=CAT.tables[tm[1]];
-      if(tm[2]&&tb.columns[tm[2]])return {label:tb.columns[tm[2]], pathLabel:tb.module+'.'+tb.group+'.'+tb.label+' · '+tb.columns[tm[2]], sourcePath:tb.source_path||''};
+    var rawTablePath=path.slice(2);
+    var tableName=Object.keys(CAT.tables).sort(function(a,b){return b.length-a.length;}).find(function(name){return rawTablePath===name||rawTablePath.indexOf(name+'[')===0||rawTablePath.indexOf(name+'.')===0;});
+    if(tableName){var tb=CAT.tables[tableName];var column=rawTablePath.slice(tableName.length).replace(/^\[\d+\]\.?/,'').replace(/^\./,'');
+      if(column&&tb.columns[column])return {label:tb.columns[column], pathLabel:tb.module+'.'+tb.group+'.'+tb.label+' · '+tb.columns[column], sourcePath:tb.source_path||''};
       return {label:tb.label, pathLabel:tb.module+'.'+tb.group+'.'+tb.label, sourcePath:tb.source_path||''};}
   }
   return null;
@@ -274,7 +274,7 @@ function fieldMeta(path){
 function repeatTableName(page){
   page=page||currentPage();
   if(!page||!page.repeat)return '';
-  var m=(page.repeat||'').match(/^t\.(\w+)$/);return m?m[1]:'';
+  var m=(page.repeat||'').match(/^t\.(.+)$/);return m?m[1]:'';
 }
 function repeatTableMeta(page){
   var name=repeatTableName(page);
@@ -336,6 +336,10 @@ function ensureEditablePage(){
 }
 
 async function loadData(){
+  if(WORKSPACE_ID){
+    var context=await(await api('/api/connectors/workspaces/'+WORKSPACE_ID+'/templates/'+encodeURIComponent(WORKSPACE_TEMPLATE)+'/binding-context')).json();
+    state.bindingContext=context;CAT=context.catalog;state.data=context.data;renderFieldHint();return true;
+  }
   var which=$('#selData').value;
   var version=(state.dataRequest||0)+1;state.dataRequest=version;
   if(which==='empty'){
@@ -419,7 +423,8 @@ function persistDeck(){try{localStorage.setItem(LS_KEY,JSON.stringify({template:
 }
 async function syncDeckDraft(){
   if(draftSaving||!draftPending)return;draftPending=false;draftSaving=true;$('#draftSyncStatus').textContent='正在保存工作台草稿…';
-  try{var res=await api('/api/ppt/sources/'+FORM_APP+'/drafts/'+(FORM_PROJECT||'templates'),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:draftRevision,payload:{template:state.template,baseTemplate:state.baseTemplate,deck:state.deck}})});
+  var draftPath=WORKSPACE_ID?('/api/connectors/workspaces/'+WORKSPACE_ID+'/templates/'+encodeURIComponent(WORKSPACE_TEMPLATE)+'/binding'):('/api/ppt/sources/'+FORM_APP+'/drafts/'+(FORM_PROJECT||'templates'));
+  try{var res=await api(draftPath,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:draftRevision,payload:{template:state.template,baseTemplate:state.baseTemplate,deck:state.deck}})});
     draftRevision=(await res.json()).revision;$('#draftSyncStatus').textContent='工作台草稿已保存到服务端';
   }catch(e){draftReady=false;draftPending=false;$('#draftSyncStatus').textContent='草稿未同步：'+e.message+'。当前浏览器备份仍保留，可先保存为方案。';}
   finally{draftSaving=false;if(draftPending)syncDeckDraft();}
@@ -822,7 +827,7 @@ function addPartialBinding(path){
   if(!path){toast('请选择字段');return;}
   if(range.text.includes('\n')){toast('请逐行选择要替换的片段，不要跨行选择');return;}
   var value=resolvePath(path);
-  if(value!==null&&typeof value==='object'||typeof value==='string'&&value.indexOf('data:image/')===0||path.indexOf('i.')===0){toast('请选择文字或数字字段，不能选择图片或整张表格');return;}
+  if(value!==null&&typeof value==='object'||EditorModels.isImageSource(path,value)){toast('请选择文字或数字字段，不能选择图片或整张表格');return;}
   if(bar._partialDraft.some(function(r){return r.start<range.end&&r.end>range.start&&!(r.start===range.start&&r.end===range.end);})){toast('所选文字与已有绑定重叠，请先移除原绑定');return;}
   bar._partialDraft=bar._partialDraft.filter(function(r){return r.start!==range.start||r.end!==range.end;});
   bar._partialDraft.push(Object.assign({},range,{source:path}));
@@ -952,17 +957,17 @@ function updateSelHint(info){
   if(!path){hint.textContent='请输入/选择要关联的字段（见下方目录与建议）。';return;}
   var meta=metaOf(path);
   var val=resolvePath(path);
-  var isImgValue = (typeof val==='string' && /^data:image\//.test(val))
-    || (Array.isArray(val) && val.length && typeof val[0]==='string' && /^data:image\//.test(val[0]));
+  var isImgValue=EditorModels.isImageValue(val)||/^i\./.test(path);
+  var isImgSource=EditorModels.isImageSource(path,val);
   var warn='';
   var type=$('#selBindType')?$('#selBindType').value:'text';
   var curText=val===undefined?'（无/空）':(Array.isArray(val)?('数组 '+val.length+' 条'):(isImgValue?('（图片 '+val.length+' 字符）'):String(val).slice(0,120)));
-  if((type==='image'||type==='image_region') && typeof val==='string' && val!=='' && !/^data:image\//.test(val)){
+  if((type==='image'||type==='image_region') && !isImgSource && typeof val==='string' && val!==''){
     warn='<div class="bad" style="margin-top:2px">⚠ 该字段当前是普通文本，不是图片（如公司名称/文字说明）。'
-      +'请改为：① 关联图片字段（值以 data:image 开头，如公司 LOGO / 分型图 / 问题图）；'
+      +'请改为：① 关联图片字段（data:image 图片、http 图片地址，或目录里的“图片”字段）；'
       +'或 ② 把绑定方式改为“文本替换”。</div>';
-  }else if(type==='text' && isImgValue){
-    warn='<div class="bad" style="margin-top:2px">⚠ 该字段是图片内容，文本替换会把整段图片编码写进文本框。'
+  }else if(type==='text' && isImgSource){
+    warn='<div class="bad" style="margin-top:2px">⚠ 该字段是图片内容，文本替换会把图片地址写进文本框。'
       +'请改为“图片替换”，或绑定文字字段。</div>';
   }
   var html='<span class="ok">'+esc(meta.pathLabel)+'</span> <span class="mono">'+esc(path)+'</span>';
@@ -1022,13 +1027,12 @@ function bindNow(path, info){
   if(type==='formula'){insertFormulaField(path);return true;}
   if(type==='text_replace'){addPartialBinding(path);return true;}
   var val=resolvePath(path);
-  var isImgVal=function(v){return (typeof v==='string'&&/^data:image\//.test(v))
-    ||(Array.isArray(v)&&v.length&&typeof v[0]==='string'&&/^data:image\//.test(v[0]));};
-  if((type==='image'||type==='image_region')&&typeof val==='string'&&val!==''&&!/^data:image\//.test(val)){
+  var isImgVal=function(v){return EditorModels.isImageValue(v);};
+  if((type==='image'||type==='image_region')&&typeof val==='string'&&val!==''&&!EditorModels.isImageSource(path,val)){
     toast('该字段当前是普通文本，不是图片 —— 请改用文字字段，或把绑定方式改为“文本替换”');
     return false;
   }
-  if(type==='text'&&isImgVal(val)){
+  if(type==='text'&&EditorModels.isImageSource(path,val)){
     toast('该字段是图片内容 —— 请点选页面上的图片对象后绑定，或改用文字字段');
     return false;
   }
@@ -1101,23 +1105,20 @@ function renderFieldHint(){
   var byModule={};
   CAT.fields.forEach(function(x){(byModule[x.module]=byModule[x.module]||[]).push(x.path);});
   var sections='';
-  Object.keys(byModule).forEach(function(mod){
-    sections+=section(mod+'（网页表单填写）',mod.indexOf('项目')===0||mod.indexOf('产品')===0,byModule[mod]);
+  Object.keys(byModule).forEach(function(mod,index){
+    sections+=section(mod,index===0,byModule[mod]);
   });
   var tb=repeatTableMeta();
   if(tb){
     var cols=Object.keys(tb.columns);
     sections+=section('本页重复数组行字段（'+repeatTableName()+'，每条一行）',true,cols);
   }
-  var tblChips=Object.keys(CAT.tables).map(function(name){
-    var x=CAT.tables[name];
-    return '<button class="chip-btn" data-tbl="'+esc(name)+'" title="t.'+esc(name)+'（'+esc(x.label)+'）">'
-      +'整表填入：'+esc(x.module+'.'+x.group+' · '+x.label)+'</button>';
-  }).join(' ');
-  sections+='<details style="margin:2px 0"><summary style="cursor:pointer;font-size:11.5px;color:#c25200">'
-    +'表格表单数据 t.*（履历/文件状态/材料/公差/问题…）<span class="hint">先点选页面上的表格对象，再点一项 → 整表填入</span>'
-    +'（'+Object.keys(CAT.tables).length+'）</summary><div style="margin-top:3px">'+tblChips+'</div></details>';
-  sections+=section('图片（上传到表单）',false,Object.keys(CAT.images).map(function(k){return CAT.images[k].path;}));
+  var tablesByModule={};
+  Object.keys(CAT.tables).forEach(function(name){var x=CAT.tables[name];(tablesByModule[x.module]=tablesByModule[x.module]||[]).push(name);});
+  Object.keys(tablesByModule).forEach(function(mod){var names=tablesByModule[mod];var chips=names.map(function(name){var x=CAT.tables[name];return '<button class="chip-btn" data-tbl="'+esc(name)+'" title="t.'+esc(name)+'（'+esc(x.label)+'）">整表填入：'+esc(x.group+' · '+x.label)+'</button>';}).join(' ');sections+='<details style="margin:2px 0"><summary style="cursor:pointer;font-size:11.5px;color:#c25200">'+esc(mod+' · 表格')+'（'+names.length+'）<span class="hint">先点选页面表格，再选择分类数据</span></summary><div style="margin-top:3px">'+chips+'</div></details>';});
+  var imagesByModule={};
+  Object.keys(CAT.images).forEach(function(name){var x=CAT.images[name];(imagesByModule[x.module]=imagesByModule[x.module]||[]).push(x.path);});
+  Object.keys(imagesByModule).forEach(function(mod){sections+=section(mod+' · 图片',false,imagesByModule[mod]);});
   sections+=section('自动计算值',false,Object.keys(CAT.derived).map(function(k){return 'derived.'+k;}));
   sections+=section('工艺计算结论',false,Object.keys(CAT.results).map(function(k){return 'calc_results.'+k+'.verdict';}));
   $('#fieldHint').innerHTML=sections;
@@ -1288,6 +1289,32 @@ function restore(){
 }
 window.addEventListener('DOMContentLoaded',async function(){
 try{
+if(WORKSPACE_ID){
+  if(!WORKSPACE_TEMPLATE)throw new Error('缺少要绑定的模板');
+  var context=await(await api('/api/connectors/workspaces/'+WORKSPACE_ID+'/templates/'+encodeURIComponent(WORKSPACE_TEMPLATE)+'/binding-context')).json();
+  state.bindingContext=context;state.data=context.data;CAT=context.catalog;
+  document.querySelector('header b').textContent=context.workspace.name+' · 字段绑定';
+  document.title=context.workspace.name+' · PPT 字段绑定';
+  document.querySelector('header .back').href='/ppt';
+  document.querySelector('header .back').textContent='← 返回工作空间';
+  document.querySelector('header span').textContent='点击模板对象 → 选择项目字段 → 自动保存绑定';
+  $('#fieldCatalogTitle').textContent='当前项目分类数据（绑定到 PPT 模板目标）';
+  $('#fieldCatalogHelp').textContent='字段、表格和图片按当前项目的接口类别展示。先选择上方 PPT 模板目标，再选择对应分类数据建立显式绑定；表格行保留项目、工序和库行外键。';
+  var workspaceDatasets=context.datasets||[context.dataset];
+  $('#dataSourceLabel').textContent='工作空间合并数据（'+workspaceDatasets.length+' 个系统接口）';
+  $('#selData').innerHTML='<option value="workspace">'+esc(workspaceDatasets.map(function(item){return item.name||item.source;}).join(' ＋ '))+'</option>';
+  await refreshTemplates();$('#selTemplate').value=WORKSPACE_TEMPLATE;
+  $('#selTemplate').disabled=true;$('#btnRefreshTemplates').hidden=true;$('#fileUpload').hidden=true;
+  if($('#fileUpload').previousElementSibling)$('#fileUpload').previousElementSibling.hidden=true;
+  var binding=context.binding||{};draftRevision=binding.revision||0;draftReady=true;
+  if(binding.payload){state.template=binding.payload.template||WORKSPACE_TEMPLATE;state.baseTemplate=binding.payload.baseTemplate||WORKSPACE_TEMPLATE;state.deck=binding.payload.deck||[];state.current=0;$('#draftSyncStatus').textContent='已载入工作空间绑定配置';}
+  else{restore();state.template=state.template||WORKSPACE_TEMPLATE;state.baseTemplate=state.baseTemplate||WORKSPACE_TEMPLATE;$('#draftSyncStatus').textContent='绑定修改将自动保存到工作空间';}
+  $('#selTemplate').value=state.template||WORKSPACE_TEMPLATE;
+  if(!$('#inpSchemeName').value)$('#inpSchemeName').value=context.workspace.name+' · '+(context.template.source_name||WORKSPACE_TEMPLATE);
+  await loadTemplate(state.deck.length?state.deck:undefined);
+  await refreshSchemeList(FORM_PARAMS.get('scheme'));
+  return;
+}
 var formApp=await(await api('/api/ppt/sources/'+FORM_APP)).json();
 document.querySelector('header b').textContent=formApp.name+' · PPT 工作台';
 document.title=formApp.name+' · PPT 工作台';

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-from app.demo import demo_state
+from tests.demo_data import demo_state
 from app.dfm import adapt_legacy_report
 from app.report.ppt import SlidePlanner, audit_legacy_retirement
 

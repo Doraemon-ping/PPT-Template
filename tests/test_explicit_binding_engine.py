@@ -7,7 +7,7 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.util import Inches
 
-from app.demo import demo_state
+from tests.demo_data import demo_state
 from app.report.ppt.deck import DeckDefinition, DeckSlide
 from app.report.ppt.template_engine import TemplateEngine
 
@@ -345,7 +345,7 @@ class ExplicitShapeBindingEngineTests(unittest.TestCase):
 
     def test_demo_contains_default_tables(self):
         """示例数据补全默认表格（dfmHist / fileStat / issues …），任意 t.* 整表绑定可用。"""
-        from app.demo import demo_state as _ds
+        from tests.demo_data import demo_state as _ds
 
         state = _ds()
         self.assertIn("fileStat", state["t"])

@@ -233,7 +233,6 @@ class PlatformStore:
             db.close()
 
     def application(self, app_id, *, allow_archived=False):
-        if app_id == 'dfm': return {'id': 'dfm', 'name': '高压压铸 DFM', 'builtin': True}
         with self.connect() as db:
             r = db.execute('SELECT id,name,schema_json,warnings_json,created,archived FROM apps WHERE id=?', (app_id,)).fetchone()
         if not r: raise HTTPException(404, '表单应用不存在')
@@ -318,7 +317,7 @@ def router_for(get_store, static_dir):
         store = get_store()
         with store.connect() as db:
             items = [dict(r) for r in db.execute('SELECT id,name,created,archived FROM apps WHERE archived=? ORDER BY created DESC', (int(archived),))]
-        return {'apps': ([] if archived else [store.application('dfm')]) + items}
+        return {'apps': items}
 
     @router.post('/api/form-apps/discover')
     async def discover(file: UploadFile):
@@ -376,8 +375,6 @@ def router_for(get_store, static_dir):
 
     @router.post('/api/form-apps/{app_id}/archive')
     def archive_app(app_id: str, archived: bool = True):
-        if app_id == 'dfm':
-            raise HTTPException(422, '内置 DFM 表单不能删除')
         store = get_store()
         store.application(app_id, allow_archived=True)
         with store.connect() as db:
@@ -388,9 +385,6 @@ def router_for(get_store, static_dir):
     def get_catalog(app_id: str, project_id: str | None = None):
         store = get_store()
         application = store.application(app_id)
-        if app_id == 'dfm':
-            source = (static_dir / 'dfm_catalog.js').read_text(encoding='utf-8')
-            return json.loads(source[source.index('{'):source.rfind('}')+1])
         if application['schema'].get('runtime'):
             if project_id:
                 snapshot = store.project(app_id, project_id)['data']
@@ -407,9 +401,6 @@ def router_for(get_store, static_dir):
     def get_defaults(app_id: str):
         store = get_store()
         application = store.application(app_id)
-        if app_id == 'dfm':
-            from .demo import demo_state
-            return demo_state()
         return defaults(application['schema'])
 
     @router.get('/api/form-apps/{app_id}/projects')

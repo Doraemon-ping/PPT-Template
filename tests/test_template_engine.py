@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pptx import Presentation
 
-from app.demo import demo_state
+from tests.demo_data import demo_state
 from app.report.ppt.deck import DeckDefinition, DeckPlanner, DeckSlide
 from app.report.ppt.template_engine import TemplateEngine
 

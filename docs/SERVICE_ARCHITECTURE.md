@@ -77,6 +77,21 @@ data/
 
 `id` 是连接标识；一个连接可发布多个 `source_id`，但所有数据源标识必须全局唯一，只用字母、数字、下划线、短横线，最长 80 字符。连接文件按请求读取，更新无须修改或重启工作台。
 
+本机机加 DFM 的实际配置（工作台默认没有连接文件，等于没有数据源）：
+
+```json
+{"connections":[
+  {"id":"machining","base_url":"http://127.0.0.1:8002"}
+]}
+```
+
+配套两条易踩的规则：
+
+- **模板/方案/草稿按 `source_id` 隔离**。表单跳转带的 `app_id` 就是 `source_id`（机加为 `machining-dfm`），
+  上传模板必须带同一个 `app_id`，否则编辑器里模板列表为空。
+- 校验整条链路（快照取数 + 真实生成 + 方案复用）用 `scripts/check_machining_binding.py`，
+  细节见 [机加 DFM 项目 id → PPT 工作台绑定](MACHINING_PROJECT_BINDING.md)。
+
 新项目实现三类接口：
 
 | 方法/路径（前缀 `/api/ppt-provider/v1`） | 返回内容 |
@@ -115,7 +130,9 @@ data/
 ## 5. 配置与安全边界
 
 - `PPT_WORKBENCH_URL`：表单跳转及旧方案生成代理的工作台地址，默认 8003。
-- `HPDC_PROVIDER_URL`、`MACHINING_PROVIDER_URL`：没有连接配置文件时的工作台后端连接地址。
+- 工作台的数据源**只有**连接文件一条路（`data/ppt_workbench/connections.json` 或 `PPT_CONNECTIONS_FILE`）：
+  没有文件就是没有数据源。拆分前那版按 `HPDC_PROVIDER_URL`/`MACHINING_PROVIDER_URL` 兜底并内置
+  8001/8002 两个连接的行为已在工作台重构中移除（工作台不再内置任何业务系统）。
 - `HPDC_PUBLIC_URL`、`MACHINING_PUBLIC_URL`：用户浏览器可访问的表单地址；跨机器部署必须配置，不能给远程用户返回 `127.0.0.1`。
 - `PPT_PROVIDER_TOKEN`：在各表单进程配置后，提供方 API 要求 `Authorization: Bearer ...`。工作台连接可添加 `token_env`，指向工作台进程中保存对应令牌的环境变量。令牌不写前端或连接 JSON。
 - 默认是受信本机/内网工具，不是完整多租户系统。工作台本身、表单项目 API 及日志接口没有统一用户鉴权；不得直接暴露公网。对外部署需反向代理鉴权、HTTPS、权限隔离和限流。

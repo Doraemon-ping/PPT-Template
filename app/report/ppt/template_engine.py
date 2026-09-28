@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional
 
 from .deck import DeckDefinition, DeckPlanner, SlideOp
-from .openxml.image_binding import ImageBindingFiller
+from .openxml.image_binding import ImageBindingFiller, is_image_reference
 from .openxml.package_editor import OoxmlPackage, OoxmlPackageError
 from .openxml.placeholder_scanner import PlaceholderScanner
 from .openxml.slide_repeater import clone_slide, rebuild_presentation
@@ -308,7 +308,7 @@ class TemplateEngine:
             # unambiguous legacy case without changing the user's saved scheme.
             sample = value[0] if isinstance(value, (list, tuple)) and value else value
             if spec.type == 'table_cell' and (spec.source.startswith('i.') or
-                    isinstance(sample, str) and sample.startswith('data:image/')):
+                    is_image_reference(sample)):
                 spec = spec.model_copy(update={'type': 'image_region'})
             table_slice = op.table_data.get(bind_key)
             if table_slice is not None:

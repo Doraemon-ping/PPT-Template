@@ -2,7 +2,7 @@
 import copy
 import unittest
 
-from app.demo import demo_state
+from tests.demo_data import demo_state
 from app.dfm.adapters import LegacyDFMReportAdapter, adapt_legacy_report
 from app.dfm.models import IssueSeverity
 

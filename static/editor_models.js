@@ -1,9 +1,18 @@
 (function(root){
   'use strict';
   function copy(value){return JSON.parse(JSON.stringify(value));}
-  function isImageSource(path,value){
+  // 图片字段的值有三种形态：data: 内联图片、http(s) 图片地址（接口接入的图片字段，
+  // 地址常常没有扩展名）、以及本地文件路径；i. 前缀是服务端字段目录给出的图片信号。
+  function isImageValue(value){
     var sample=Array.isArray(value)?value[0]:value;
-    return /^i\./.test(path||'')||typeof sample==='string'&&/^data:image\//.test(sample);
+    if(typeof sample!=='string')return false;
+    var text=sample.trim();
+    if(!text)return false;
+    if(/^data:image\//i.test(text))return true;
+    return /^https?:\/\/[^\s]+\.(png|jpe?g|gif|webp|bmp|svg)(\?[^\s]*)?$/i.test(text);
+  }
+  function isImageSource(path,value){
+    return /^i\./.test(path||'')||isImageValue(value);
   }
   function cellBindingType(selectedType,path,value){
     return isImageSource(path,value)||selectedType==='image_region'?'image_region':selectedType==='text_template'?'text_template':'table_cell';
@@ -18,6 +27,16 @@
   function insertPage(deck,page,index){
     if(!Number.isInteger(index)||index<0||index>deck.length)throw new Error('插入位置无效');
     var next=deck.slice();next.splice(index,0,copy(page));return next;
+  }
+  /* 工作台 API 路径的作用域：
+     普通模式（表单跳转）用 app_id 选择表单提供方取数；
+     工作空间模式的数据来自 API Connector（Dataset），带上 app_id 会让后端去解析一个
+     并不存在的表单提供方，模板清单/扫描/预览/生成会全部 404 —— 所以工作空间不发 app_id。 */
+  function scopedApiPath(path,options){
+    var opts=options||{};
+    var url=new URL(path,opts.origin||'http://127.0.0.1');
+    if(!opts.workspaceId&&opts.appId)url.searchParams.set('app_id',opts.appId);
+    return url.pathname+url.search;
   }
   function aliases(entries,expression){
     var paths={},labels={};
@@ -56,6 +75,6 @@
     if(/[\[\]|]/.test(b.numerator.replace(/\{[^}]*\}/g,''))||/[\[\]|]/.test(b.denominator.replace(/\{[^}]*\}/g,'')))throw new Error('暂不支持嵌套分式');
     return '[['+b.numerator+'|'+b.denominator+']]';
   }).join('');}
-  var api={copy:copy,isImageSource:isImageSource,cellBindingType:cellBindingType,tableBinding:tableBinding,insertPage:insertPage,aliases:aliases,toHuman:toHuman,toCode:toCode,parseFormula:parseFormula,serializeFormula:serializeFormula};
+  var api={copy:copy,isImageSource:isImageSource,isImageValue:isImageValue,cellBindingType:cellBindingType,tableBinding:tableBinding,insertPage:insertPage,scopedApiPath:scopedApiPath,aliases:aliases,toHuman:toHuman,toCode:toCode,parseFormula:parseFormula,serializeFormula:serializeFormula};
   if(typeof module!=='undefined'&&module.exports)module.exports=api;else root.EditorModels=api;
 })(typeof window!=='undefined'?window:this);

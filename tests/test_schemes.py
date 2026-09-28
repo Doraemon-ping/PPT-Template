@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pptx import Presentation
 
-from app.demo import demo_state
+from tests.demo_data import demo_state
 from app.report.ppt.scheme_service import SchemeError, SchemeService
 
 ROOT = Path(__file__).resolve().parents[1]

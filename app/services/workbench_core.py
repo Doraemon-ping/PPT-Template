@@ -67,10 +67,9 @@ class ProviderHub:
         if path.exists():
             items = json.loads(path.read_text(encoding='utf-8'))['connections']
         else:
-            items = [
-                {'id': 'hpdc', 'base_url': os.environ.get('HPDC_PROVIDER_URL', 'http://127.0.0.1:8001')},
-                {'id': 'machining', 'base_url': os.environ.get('MACHINING_PROVIDER_URL', 'http://127.0.0.1:8002')},
-            ]
+            # The workbench starts empty. Data providers must be configured;
+            # there are no built-in business systems or sample form sources.
+            items = []
         return items
 
     async def call(self, connection, path, method='GET', body=None):
@@ -171,11 +170,15 @@ def draft_db():
 def install_api(app):
     @app.middleware('http')
     async def source_scope(request: Request, call_next):
-        source_id = request.query_params.get('app_id', 'dfm')
+        requested_source_id = request.query_params.get('app_id')
+        # No implicit form provider: direct workbench calls use the neutral
+        # built-in template namespace and the data supplied in the request.
+        # A provider is contacted only when the caller explicitly selects it.
+        source_id = requested_source_id or 'dfm'
         token = scope.set(source_id)
         origin_token = request_origin.set(str(request.base_url).rstrip('/'))
         try:
-            if request.url.path.startswith(('/api/template', '/api/schemes')):
+            if requested_source_id and request.url.path.startswith(('/api/template', '/api/schemes')):
                 await hub.resolve(source_id)
                 # Legacy callers are normalized by the owning form API.
                 # Modern workbench snapshots already carry calculated context.

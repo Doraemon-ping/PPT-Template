@@ -1,4 +1,5 @@
 """Character-range bindings that leave unselected PowerPoint runs intact."""
+from .image_binding import is_image_reference
 from .shape_binding import NS, ShapeBindingError
 
 
@@ -57,7 +58,8 @@ def replace_text_segments(target, options, resolver):
             # Missing optional form data must not erase the selected source text.
             if not found or value is None or value == '':
                 continue
-            if isinstance(value, (dict, list, tuple)) or str(value).startswith('data:image/'):
+            if (isinstance(value, (dict, list, tuple)) or str(entry.get('source', '')).startswith('i.')
+                    or is_image_reference(value)):
                 raise ShapeBindingError('文字片段只能绑定文字或数字，不能绑定图片或表格')
             edits.append((start, end, str(value)))
     except (KeyError, TypeError, ValueError) as exc:

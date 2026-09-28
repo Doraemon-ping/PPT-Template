@@ -7,7 +7,7 @@
 
 环境变量：WORKBENCH_HOST / WORKBENCH_PORT / DFM_APP_ROOT（数据根目录，默认项目根）
 数据目录：<DFM_APP_ROOT>/data/ppt_workbench/（模板、方案、草稿、预览缓存）
-数据源连接：config/ppt-connections.json（可复制 config/ppt-connections.example.json）
+API 连接配置：data/ppt_workbench/workbench.sqlite3（首次启动为空）
 """
 import argparse
 import os

@@ -1,7 +1,14 @@
 # -*- coding: utf-8 -*-
 """Open XML zip-level package editing for template-driven generation."""
 
-from .image_binding import ImageBindingError, ImageBindingFiller, decode_image_bytes
+from .image_binding import (
+    ImageBindingError,
+    ImageBindingFiller,
+    decode_image_bytes,
+    download_image,
+    is_image_reference,
+    is_image_url,
+)
 from .package_editor import OoxmlPackage, OoxmlPackageError, open_package
 from .placeholder_scanner import PlaceholderMatch, PlaceholderScanner, SlideScan, TemplateScan
 from .shape_binding import (
@@ -46,7 +53,10 @@ __all__ = [
     "TextBindingFiller",
     "clone_slide",
     "decode_image_bytes",
+    "download_image",
     "find_shape",
+    "is_image_reference",
+    "is_image_url",
     "open_package",
     "rebuild_presentation",
     "set_shape_text",
